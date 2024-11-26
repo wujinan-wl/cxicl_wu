@@ -1,7 +1,4 @@
-#!/bin/bash
-
-# 獲取腳本完整路徑
-SCRIPT_PATH=$(realpath "$0")
+CRIPT_PATH=$(realpath "$0")
 
 # 日誌文件
 LOG_FILE="/var/log/cdn_node_monitor_setup.log"
@@ -77,3 +74,4 @@ if [ $? -eq 0 ]; then
 else
     echo "腳本執行失敗，請檢查日誌：$LOG_FILE"
 fi
+
