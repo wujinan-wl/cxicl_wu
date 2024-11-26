@@ -1,3 +1,6 @@
+#!/bin/bash
+
+# 獲取腳本完整路徑
 CRIPT_PATH=$(realpath "$0")
 
 # 日誌文件
