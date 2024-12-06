@@ -50,7 +50,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/bin/bash -c 'source /opt/venv/bin/activate && python /root/cdn_node_monitor.py --bandwidth_limit 150 --load_limit 12'
+ExecStart=/bin/bash -c 'source /opt/venv/bin/activate && python /root/cdn_node_monitor.py --bandwidth_limit 100 --load_limit 12'
 KillMode=process
 Restart=always
 RestartSec=3s
