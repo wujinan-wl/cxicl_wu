@@ -92,7 +92,7 @@ install_python() {
 }
 
 # 安裝監控：下載並執行LibreNMS監控安裝腳本
-install_monitoring() {
+install_lnms() {
     echo -e "${YELLOW}下載 LibreNMS 安裝腳本...${RESET}"
     wget -O master_runner.sh ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/LibreNMS/master_runner.sh || error_exit "下載 LibreNMS 腳本失敗"
     chmod +x master_runner.sh || error_exit "無法賦予執行權限"
@@ -150,43 +150,113 @@ install_docker() {
     echo -e "${GREEN}Docker ${FINAL_VERSION} 安裝完成！${RESET}"
 }
 
-# 安裝節點流程
-install_cdnfly_node(){
+# 同步 portainer container
+sync_portainer(){
+    echo -e "${YELLOW}同步 portainer container...${RESET}"
+
+    # 檢查 container 是否已存在
+    if docker ps -a --format '{{.Names}}' | grep -w portainer_agent >/dev/null 2>&1; then
+        echo -e "${YELLOW}portainer_agent container 已存在，先移除再重建...${RESET}"
+        docker rm -f portainer_agent || error_exit "無法移除舊的 portainer_agent container"
+    fi
+
+    # 執行 docker run
+    docker run -d \
+        -p 9101:9001 \
+        --name portainer_agent \
+        --restart=always \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v /var/lib/docker/volumes:/var/lib/docker/volumes \
+        -v /:/host \
+        portainer/agent:2.27.8 || error_exit "portainer_agent container 建立失敗"
+
+    # 驗證 container 是否啟動
+    if ! docker ps | grep -w portainer_agent >/dev/null 2>&1; then
+        error_exit "portainer_agent container 啟動失敗"
+    else
+        echo -e "${GREEN}portainer_agent container 啟動成功！${RESET}"
+    fi
+}
+
+
+#===========================MODE======================================
+
+# mode-安裝節點
+install_cdnfly_node_mode(){
     check_selinux
     preinstall_yum
     disable_firewalld
     install_python
-    install_monitoring
+    install_lnms
     install_docker
+    sync_portainer
 }
 
-
-# 非安裝節點流程
-only_install_docker(){
+# mode-僅安裝 Docker
+only_install_docker_mode(){
     check_selinux
     preinstall_yum
     install_docker
 }
 
+# mode-安裝 Docker 及 Portainer模式
+install_docker_portainer_mode(){
+    check_selinux
+    preinstall_yum
+    disable_firewalld
+    install_docker
+    sync_portainer
+}
 
-# 讓使用者選擇模式
-echo "請選擇模式:"
+#===========================BRANCH=====================================
+
+# branch-安裝節點
+install_cdnfly_node_branch(){
+    echo -e "${YELLOW}已選擇安裝節點模式！${RESET}"
+    install_cdnfly_node_mode
+    echo -e "${GREEN}模式所有安裝步驟執行完成！${RESET}"
+}
+
+# branch-安裝docker
+install_docker_branch(){
+    echo "1. 僅安裝 Docker模式"
+    echo "2. 安裝 Docker 及 Portainer模式"
+    read mode2
+
+    if [ $mode2 -eq 1 ]
+    then
+        echo -e "${YELLOW}已選擇僅安裝 Docker 模式！${RESET}"
+        only_install_docker_mode
+        echo -e "${GREEN}模式所有安裝步驟執行完成！${RESET}"
+    elif [ $mode2 -eq 2 ]
+    then
+        echo -e "${YELLOW}已選擇安裝 Docker 及 Portainer 模式！${RESET}"
+        install_docker_portainer_mode
+        echo -e "${GREEN}模式所有安裝步驟執行完成！${RESET}"
+    else
+        echo -e "${RED}無效的模式執行！${RESET}"
+    fi
+}
+
+#===========================MASTER====================================
+
+# master-主程式
+echo "請選擇分支:"
 echo "1. 安裝節點"
-echo "2. 僅安裝 Docker"
+echo "2. 非安裝節點(docker、portainer)"
 read mode
 
-
-# 執行執行分支安裝，根據模式執行相關程式
+# 執行主幹內容，根據分支執行相關程式
 if [ $mode -eq 1 ]
 then
-    echo -e "${YELLOW}已選擇安裝節點模式！${RESET}"
-    install_cdnfly_node
-    echo -e "${GREEN}所有安裝步驟執行完成！${RESET}"
+    echo -e "${YELLOW}已選擇安裝節點分支！${RESET}"
+    install_cdnfly_node_branch
+    echo -e "${GREEN}分支所有安裝步驟執行完成！${RESET}"
 elif [ $mode -eq 2 ]
 then
-    echo -e "${YELLOW}已選擇僅安裝 Docker 模式！${RESET}"
-    only_install_docker
-    echo -e "${GREEN}所有安裝步驟執行完成！${RESET}"
+    echo -e "${YELLOW}已選擇非安裝節點(docker、portainer)分支！${RESET}"
+    install_docker_branch
+    echo -e "${GREEN}分支所有安裝步驟執行完成！${RESET}"
 else
-    echo -e "${RED}無效的模式！${RESET}"
+    echo -e "${RED}無效的分支！${RESET}"
 fi
