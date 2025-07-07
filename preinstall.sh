@@ -3,7 +3,7 @@
 #安裝
 #curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh | bash
 #curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh | sudo bash #root
-
+#bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh)
 
 # 啟用錯誤即停
 set -e
