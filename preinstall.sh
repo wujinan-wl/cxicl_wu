@@ -1,5 +1,10 @@
 #!/bin/bash
 
+#安裝
+#curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh | bash
+#curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh | sudo bash #root
+
+
 # 啟用錯誤即停
 set -e
 set -o pipefail
