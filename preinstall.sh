@@ -56,18 +56,20 @@ preinstall_yum() {
 # 處理防火牆：關閉firewalld防火牆並驗證其狀態
 disable_firewalld() {
     echo -e "${YELLOW}關閉 firewalld 防火牆...${RESET}"
-    systemctl stop firewalld || error_exit "無法停止 firewalld"
-    systemctl disable firewalld || error_exit "無法停用 firewalld"
-    sleep 3
-
     STATE=$(systemctl is-active firewalld 2>/dev/null || true)
+    sleep 3
 
     if [[ "$STATE" == "inactive" ]]; then
         echo -e "${GREEN}firewalld 防火牆已關閉${RESET}"
     elif [[ "$STATE" == "unknown" ]]; then
-    echo -e "${GREEN}firewalld 未安裝，視同已關閉${RESET}"
+        echo -e "${GREEN}firewalld 未安裝，視同已關閉${RESET}"
+    elif [[ "$STATE" == "active" ]]; then
+        echo -e "${RED}firewalld 防火牆仍在運作中，關閉中請等待其關閉...${RESET}"
+        systemctl stop firewalld || error_exit "無法停止 firewalld"
+        systemctl disable firewalld || error_exit "無法停用 firewalld"
+        sleep 3
     else
-        error_exit "firewalld 防火牆未成功關閉，請手動確認"
+        error_exit "firewalld 防火牆未成功關閉，請稍後手動確認"
     fi
 }
 
@@ -252,11 +254,13 @@ then
     echo -e "${YELLOW}已選擇安裝節點分支！${RESET}"
     install_cdnfly_node_branch
     echo -e "${GREEN}分支所有安裝步驟執行完成！${RESET}"
+    docker ps -a
 elif [ $mode -eq 2 ]
 then
     echo -e "${YELLOW}已選擇非安裝節點(docker、portainer)分支！${RESET}"
     install_docker_branch
     echo -e "${GREEN}分支所有安裝步驟執行完成！${RESET}"
+    docker ps -a
 else
     echo -e "${RED}無效的分支！${RESET}"
 fi
