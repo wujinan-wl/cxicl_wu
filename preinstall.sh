@@ -5,6 +5,9 @@
 #curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh | sudo bash #root
 #bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh)
 
+
+#!/bin/bash
+
 # 啟用錯誤即停
 set -e
 set -o pipefail
@@ -224,8 +227,8 @@ install_cdnfly_node_mode(){
     preinstall_yum
     disable_firewalld
     install_python
-    sync_portainer
     install_docker
+    sync_portainer
     install_lnms
 }
 
