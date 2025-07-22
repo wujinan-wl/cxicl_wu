@@ -100,6 +100,7 @@ delete_portainer_environment() {
 
     if [ -z "$ENDPOINT_ID" ]; then
     echo -e "${RED} 找不到名稱為 \"$TARGET_NAME\" 的 Endpoint ${RESET}"
+    exit 1
     fi
 
     echo -e "${GREEN} 找到 Endpoint \"$TARGET_NAME\"，ID 為：$ENDPOINT_ID ${RESET}"
@@ -112,6 +113,7 @@ delete_portainer_environment() {
     echo -e "${GREEN} 已成功刪除 Endpoint \"$TARGET_NAME\" (ID: $ENDPOINT_ID) ${RESET}"
     else
     echo -e "${RED} 刪除失敗，HTTP 狀態碼：$DELETE_RESULT ${RESET}"
+    exit 1
     fi
 }
 
@@ -193,6 +195,6 @@ delete_portainer
 install_python
 remove_lnms
 cd /opt/ && rm -rf remove_LibreNMS_device.py
-rm -rf /root/uninstall.sh
+rm -rf /root/pt_uninstall.sh
 rm -rf /root/preinstall.sh
 
