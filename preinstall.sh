@@ -6,12 +6,6 @@
 #bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh)
 
 
-#!/bin/bash
-
-# 啟用錯誤即停
-set -e
-set -o pipefail
-
 # 顏色定義
 GREEN="\033[32m"
 RED="\033[31m"
@@ -217,6 +211,39 @@ sync_portainer(){
     fi
 }
 
+# 每天清除 Docker logs
+clean_docker_log() {
+    TARGET_SCRIPT="/var/lib/docker/containers/clean_docker_log.sh"
+    CRON_CMD="/bin/bash $TARGET_SCRIPT"
+    CRON_JOB="0 1 * * * $CRON_CMD"
+
+    echo -e "${YELLOW}建立清除 Docker log 腳本...${RESET}"
+
+    printf '#!/bin/bash\n\n' > "$TARGET_SCRIPT"
+    printf 'find /var/lib/docker/containers/ -name "*-json.log" | while read log_file; do\n' >> "$TARGET_SCRIPT"
+    printf '    if [ -f "$log_file" ]; then\n' >> "$TARGET_SCRIPT"
+    printf '        echo "[info] Clearing log"\n' >> "$TARGET_SCRIPT"
+    printf '        > "$log_file"\n' >> "$TARGET_SCRIPT"
+    printf '    fi\n' >> "$TARGET_SCRIPT"
+    printf 'done\n' >> "$TARGET_SCRIPT"
+
+    chmod +x "$TARGET_SCRIPT" || {
+        echo -e "${RED}chmod 失敗${RESET}"
+        return 1
+    }
+
+    echo -e "${YELLOW}檢查 crontab 排程是否已存在...${RESET}"
+    crontab -l 2>/dev/null | grep -F "$CRON_CMD" >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        tmp_cron="/tmp/cron_$$"
+        crontab -l 2>/dev/null > "$tmp_cron" 2>/dev/null || touch "$tmp_cron"
+        echo "$CRON_JOB" >> "$tmp_cron"
+        crontab "$tmp_cron" && rm -f "$tmp_cron"
+        echo -e "${GREEN}已加入 crontab 任務：$CRON_JOB${RESET}"
+    else
+        echo -e "${YELLOW}crontab 中已包含此任務，略過新增${RESET}"
+    fi
+}
 
 #===========================MODE======================================
 
@@ -229,6 +256,7 @@ install_cdnfly_node_mode(){
     install_python
     install_docker
     sync_portainer
+    clean_docker_log
     install_lnms
 }
 
