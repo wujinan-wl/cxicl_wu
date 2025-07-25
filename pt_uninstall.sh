@@ -7,16 +7,7 @@ RED="\033[31m"
 YELLOW="\033[33m"
 RESET="\033[0m"
 
-#################################################
-
-# 設定 Portainer 認證資訊
-PORTAINER_URL="http://61.219.175.113:9101"
-USERNAME="twnwdcxicl"
-PASSWORD="%s#ytx6WUH\$f*kF6"   # $ 要 escape
-
-#################################################
-
-# 安裝必要套件jq、curl、wget
+# 安裝必要套件curl、wget
 preinstall_packages() {
     if ! command -v curl >/dev/null 2>&1; then
         yum install -y curl || {
@@ -26,16 +17,6 @@ preinstall_packages() {
         }
     else
         echo -e "${GREEN}curl 已存在，略過安裝${RESET}"
-    fi
-
-    if ! command -v jq >/dev/null 2>&1; then
-        yum install -y jq || {
-            echo -e "${RED}安裝 jq 失敗${RESET}"
-            echo -e "${YELLOW}請更新源或是確認 yum.repos 配置是否異常${RESET}"
-            exit 1
-        }
-    else
-        echo -e "${GREEN}jq 已存在，略過安裝${RESET}"
     fi
     
     if ! command -v wget >/dev/null 2>&1; then
@@ -78,48 +59,12 @@ docker_remove_images_other() {
     fi
 }
 
-# 刪除 Portainer Environment
-delete_portainer_environment() {
-    echo -e "${YELLOW}刪除 Portainer Environment${RESET}"
-    hostname -I
-    echo -e "${YELLOW} 請輸入要刪除的IP: ${RESET}"
-    read TARGET_NAME
-
-    # Step 1: 取得 JWT Token
-    TOKEN=$(curl -s -X POST "$PORTAINER_URL/api/auth" \
-    -H "Content-Type: application/json" \
-    -d "{\"Username\":\"$USERNAME\", \"Password\":\"$PASSWORD\"}" | jq -r '.jwt')
-
-    if [ "$TOKEN" == "null" ] || [ -z "$TOKEN" ]; then
-    echo -e "${RED} 無法登入 Portainer，請檢查帳密或 URL ${RESET}"
-    fi
-
-    # Step 2: 查詢所有 Endpoints，找出符合名稱的 ID
-    ENDPOINT_ID=$(curl -s -X GET "$PORTAINER_URL/api/endpoints" \
-    -H "Authorization: Bearer $TOKEN" | jq -r ".[] | select(.Name==\"$TARGET_NAME\") | .Id")
-
-    if [ -z "$ENDPOINT_ID" ]; then
-    echo -e "${RED} 找不到名稱為 \"$TARGET_NAME\" 的 Endpoint ${RESET}"
-    exit 1
-    fi
-
-    echo -e "${GREEN} 找到 Endpoint \"$TARGET_NAME\"，ID 為：$ENDPOINT_ID ${RESET}"
-
-    # Step 3: 刪除 Endpoint
-    DELETE_RESULT=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE "$PORTAINER_URL/api/endpoints/$ENDPOINT_ID" \
-    -H "Authorization: Bearer $TOKEN")
-
-    if [ "$DELETE_RESULT" == "204" ]; then
-    echo -e "${GREEN} 已成功刪除 Endpoint \"$TARGET_NAME\" (ID: $ENDPOINT_ID) ${RESET}"
-    else
-    echo -e "${RED} 刪除失敗，HTTP 狀態碼：$DELETE_RESULT ${RESET}"
-    exit 1
-    fi
-}
-
 # 刪除現有portainer，包含container及image
 delete_portainer() {
-    echo -e "${YELLOW} 開始刪除 Portainer 所有相關 container 與 image${RESET}"
+    echo -e "${YELLOW} 開始刪除 Portainer 所有相關 container 與 image ${RESET}"
+    echo -e "${RED} 請先確認portainer上Eviroment中的資料已刪除 ${RESET}"
+    echo "按Enter繼續"
+    read input
 
     # 刪除 container（portainer 與 agent）
     for cname in portainer portainer_agent; do
@@ -187,14 +132,19 @@ remove_lnms() {
     echo -e "${GREEN} 全都處理完成，可通知機房下架 ${RESET}"
 }
 
+# 刪除機密
+delete_cxhil_sercret() {
+    cd /opt/ && rm -rf remove_LibreNMS_device.py
+    rm -rf /root/pt_uninstall.sh
+    rm -rf /root/preinstall.sh
+}
+
 preinstall_packages
 docker_stop_and_remove_containers_other
 docker_remove_images_other
-delete_portainer_environment
 delete_portainer
 install_python
 remove_lnms
-cd /opt/ && rm -rf remove_LibreNMS_device.py
-rm -rf /root/pt_uninstall.sh
-rm -rf /root/preinstall.sh
+delete_cxhil_sercret
+
 
