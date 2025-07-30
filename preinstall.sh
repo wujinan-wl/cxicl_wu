@@ -128,7 +128,6 @@ install_lnms() {
     echo -e "${YELLOW}執行 LibreNMS 安裝腳本...${RESET}"
     bash /opt/master_runner.sh || {
         echo -e "${RED}執行 LibreNMS 安裝腳本失敗${RESET}"
-        echo -e "${YELLOW}跳過 LibreNMS 監控安裝，將繼續進行 Docker 安裝${RESET}"
     }
     rm -f /opt/master_runner.sh || echo -e "${YELLOW}LibreNMS 腳本刪除失敗，請手動移除${RESET}"
     echo -e "${GREEN}LibreNMS 安裝處理完成（成功或已跳過）${RESET}"
@@ -211,7 +210,7 @@ sync_portainer(){
     fi
 }
 
-# 每天清除 Docker logs
+# 每天清除 Docker logs > cron 任務
 clean_docker_log() {
     TARGET_SCRIPT="/var/lib/docker/containers/clean_docker_log.sh"
     CRON_CMD="/bin/bash $TARGET_SCRIPT"
@@ -219,13 +218,21 @@ clean_docker_log() {
 
     echo -e "${YELLOW}建立清除 Docker log 腳本...${RESET}"
 
-    printf '#!/bin/bash\n\n' > "$TARGET_SCRIPT"
-    printf 'find /var/lib/docker/containers/ -name "*-json.log" | while read log_file; do\n' >> "$TARGET_SCRIPT"
-    printf '    if [ -f "$log_file" ]; then\n' >> "$TARGET_SCRIPT"
-    printf '        echo "[info] Clearing log"\n' >> "$TARGET_SCRIPT"
-    printf '        > "$log_file"\n' >> "$TARGET_SCRIPT"
-    printf '    fi\n' >> "$TARGET_SCRIPT"
-    printf 'done\n' >> "$TARGET_SCRIPT"
+    cat > "$TARGET_SCRIPT" <<'EOF'
+#!/bin/bash
+
+TARGET_SCRIPT_LOG="/var/lib/docker/containers/clean_docker_log.log"
+echo "[$(date '+%F %T')] 開始清除 Docker logs" >> "$TARGET_SCRIPT_LOG"
+
+find /var/lib/docker/containers/ -name "*-json.log" | while read log_file; do
+    if [ -f "$log_file" ]; then
+        echo "[$(date '+%F %T')] 清除 $log_file" >> "$TARGET_SCRIPT_LOG"
+        > "$log_file"
+    fi
+done
+
+echo "[$(date '+%F %T')] 清理結束" >> "$TARGET_SCRIPT_LOG"
+EOF
 
     chmod +x "$TARGET_SCRIPT" || {
         echo -e "${RED}chmod 失敗${RESET}"
@@ -245,6 +252,14 @@ clean_docker_log() {
     fi
 }
 
+# 下載清理容器nginx緩存
+download_container_nginx_clean_for_volume(){
+    echo -e "${YELLOW}下載 volume...${RESET}"
+    wget -O /opt/clean_cache.sh https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/clean_cache.sh
+    chmod +x /opt/clean_cache.sh
+    echo -e "${GREEN}設置完成！${RESET}"
+}
+
 #===========================MODE======================================
 
 # mode-安裝節點
@@ -257,6 +272,7 @@ install_cdnfly_node_mode(){
     install_docker
     sync_portainer
     clean_docker_log
+    download_container_nginx_clean_for_volume
     install_lnms
 }
 
