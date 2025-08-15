@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 # 顏色定義
@@ -114,7 +115,6 @@ remove_lnms() {
 
     chmod +x /root/remove_LibreNMS_device.py
     python "/root/remove_LibreNMS_device.py"
-    rm -f /root/remove_LibreNMS_device.py
     echo -e "${GREEN} 全都處理完成，可通知機房下架 ${RESET}"
 }
 
@@ -125,4 +125,6 @@ delete_portainer
 remove_lnms
 rm -rf /opt/https_test
 rm -rf /opt/Portainer
-
+rm -f /root/remove_LibreNMS_device.py
+rm -f /root/add_LibreNMS_device.py
+rm -f /root/remove_pt_enviroment.py
