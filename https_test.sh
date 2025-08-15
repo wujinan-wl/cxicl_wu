@@ -42,7 +42,7 @@ create_dir(){
     echo -e "${YELLOW}建立主目錄：$MAIN_DIR${RESET}"
     mkdir -p "$WORKDIR" # 建立工作目錄
     sleep 2
-    # wget -O /root/https_test_data.tar.gz "ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/https_test/https_test_data.tar.gz"
+    wget -O /root/https_test_data.tar.gz "ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/https_test/https_test_data.tar.gz"
     mv /root/https_test_data.tar.gz $MAIN_DIR/
     tar -xzvf $MAIN_DIR/https_test_data.tar.gz -C $MAIN_DIR/
 }
