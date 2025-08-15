@@ -5,7 +5,6 @@
 #curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh | sudo bash #root
 #bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh)
 
-
 # 顏色定義
 GREEN="\033[32m"
 RED="\033[31m"
@@ -20,18 +19,21 @@ error_exit() {
 
 # 確認 SELinux 狀態
 check_selinux() {
+    echo -e "${YELLOW}檢查 SELinux 狀態...${RESET}"
+    sleep 1
     if command -v getenforce >/dev/null 2>&1; then
         STATUS=$(getenforce)
         if [[ "$STATUS" == "Enforcing" ]]; then
             echo -e "${YELLOW}偵測到 SELinux 為 Enforcing，將修改為 Permissive${RESET}"
             setenforce 0 || {
                 echo -e "${RED}無法暫時關閉 SELinux${RESET}"
-                echo -e "${YELLOW}請手動關閉或是請機房協助關閉 SELinux${RESET}"
+                echo -e "${RED}請手動關閉或是請機房協助關閉 SELinux${RESET}"
                 exit 1
             }
             sed -i 's/^SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
         else
             echo -e "${GREEN}SELinux 狀態：$STATUS${RESET}"
+            sleep 2
         fi
     else
         echo -e "${YELLOW}系統未安裝 SELinux，略過檢查${RESET}"
@@ -41,37 +43,76 @@ check_selinux() {
 #換源
 change_yum_repos() {
     echo -e "${YELLOW}更換 yum 源...${RESET}"
-    echo -e "${RED}!!!! RAK、DNC機器建議更換源，美國防禦SP必須更換源 !!!${RESET}"
-    echo -e "${GREEN}準備更換源環境中...${RESET}"
-    sleep 7
-    echo -e "${GREEN}稍後換源建議阿里雲，選項全選擇(是)${RESET}"
+    echo -e "${YELLOW}準備更換源環境中...${RESET}"
     sleep 5
     bash <(curl -sSL https://linuxmirrors.cn/main.sh)
     echo -e "${GREEN}yum 源更換完成！${RESET}"
 }
 
-# 安裝必要套件
+# 安裝必要套件及同步時區
 preinstall_yum() {
     echo -e "${YELLOW}準備安裝必要套件...${RESET}"
+
+    # 確認是否安裝wget
     if ! command -v wget >/dev/null 2>&1; then
         yum install -y wget || {
             echo -e "${RED}安裝 wget 失敗${RESET}"
-            echo -e "${YELLOW}請更新源或是確認 yum.repos 配置是否異常${RESET}"
+            echo -e "${RED}請更新源或是確認 yum.repos 配置是否異常${RESET}"
             exit 1
         }
     else
         echo -e "${GREEN}wget 已存在，略過安裝${RESET}"
+        sleep 2
     fi
 
+    # 確認是否安裝curl
     if ! command -v curl >/dev/null 2>&1; then
         yum install -y curl || {
             echo -e "${RED}安裝 curl 失敗${RESET}"
-            echo -e "${YELLOW}請更新源或是確認 yum.repos 配置是否異常${RESET}"
-            exit 1
+            echo -e "${RED}請更新源或是確認 yum.repos 配置是否異常${RESET}"
         }
     else
         echo -e "${GREEN}curl 已存在，略過安裝${RESET}"
+        sleep 2
     fi
+
+    # 確認是否安裝whiptail
+    if ! command -v whiptail >/dev/null 2>&1; then
+        yum install -y whiptail || {
+            echo -e "${RED}安裝 whiptail 失敗${RESET}"
+            echo -e "${RED}請更新源或是確認 yum.repos 配置是否異常${RESET}"
+        }
+    else
+        echo -e "${GREEN}whiptail 已存在，略過安裝${RESET}"
+        sleep 2
+    fi
+
+    # 確認是否安裝mtr
+    if ! command -v mtr >/dev/null 2>&1; then
+        yum install -y mtr || {
+            echo -e "${RED}安裝 mtr 失敗${RESET}"
+            echo -e "${RED}請更新源或是確認 yum.repos 配置是否異常${RESET}"
+        }
+    else
+        echo -e "${GREEN}mtr 已存在，略過安裝${RESET}"
+        sleep 2
+    fi
+
+    # 確認是否安裝ntpdate
+    if ! command -v ntpdate >/dev/null 2>&1; then
+        yum install -y ntpdate || {
+            echo -e "${RED}安裝 ntpdate 失敗${RESET}"
+            echo -e "${RED}請更新源或是確認 yum.repos 配置是否異常${RESET}"
+        }
+    else
+        echo -e "${GREEN}ntpdate 已存在，略過安裝${RESET}"
+        sleep 2
+    fi
+
+    echo -e "${YELLOW}準備同步時間...${RESET}"
+    ntpdate time.stdtime.gov.tw || { echo -e "${RED}同步時間失敗，請確認網路是否正常${RESET}"; exit 1; }
+    sleep 5
+    echo -e "${GREEN}時間同步完成！${RESET}"
 }
 
 # 處理防火牆：關閉firewalld防火牆並驗證其狀態
@@ -99,12 +140,14 @@ disable_firewalld() {
 install_python() {
     echo -e "${YELLOW}安裝 Python 2.7 及 pip...${RESET}"
 
+    # 安裝python (阿里雲yum預設python版本為2.7)
     if ! command -v python2.7 >/dev/null 2>&1; then
         yum install -y python2 || error_exit "安裝 python2 失敗"
     else
         echo -e "${GREEN}Python 2.7 已存在，略過安裝${RESET}"
     fi
 
+    # 手動配置python 2.7適配的pip2
     if ! command -v pip2 >/dev/null 2>&1; then
         curl -O https://bootstrap.pypa.io/pip/2.7/get-pip.py || error_exit "下載 get-pip.py 失敗"
         python2.7 get-pip.py || {
@@ -117,20 +160,9 @@ install_python() {
     else
         echo -e "${GREEN}pip2 已存在，略過安裝${RESET}"
     fi
-}
 
-# 安裝監控：下載並執行LibreNMS監控安裝腳本（允許失敗跳過）
-install_lnms() {
-    echo -e "${YELLOW}下載 LibreNMS 安裝腳本...${RESET}"
-    wget -O master_runner.sh ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/LibreNMS/master_runner.sh || error_exit "下載 LibreNMS 腳本失敗"
-    chmod +x master_runner.sh || error_exit "無法賦予執行權限"
-    mv master_runner.sh /opt/master_runner.sh || error_exit "無法搬移腳本至 /opt"
-    echo -e "${YELLOW}執行 LibreNMS 安裝腳本...${RESET}"
-    bash /opt/master_runner.sh || {
-        echo -e "${RED}執行 LibreNMS 安裝腳本失敗${RESET}"
-    }
-    rm -f /opt/master_runner.sh || echo -e "${YELLOW}LibreNMS 腳本刪除失敗，請手動移除${RESET}"
-    echo -e "${GREEN}LibreNMS 安裝處理完成（成功或已跳過）${RESET}"
+    # pip2 (requests、netaddr、PyJWT)套件
+    pip2 install requests netaddr  PyJWT==1.7.1|| { echo -e "${RED}安裝 python + pip2 失敗${RESET}"; exit 1; }
 }
 
 # 安裝 Docker (指定版本)
@@ -183,8 +215,28 @@ install_docker() {
 
 # 同步 portainer container
 sync_portainer(){
-    echo -e "${YELLOW}同步 portainer container...${RESET}"
+    
+    # 刪除先前資料初始化
+    echo -e "${YELLOW}刪除現有 container，除了 portainer_agent${RESET}"
+    CONTAINERS=$(docker ps -a --format "{{.ID}} {{.Names}}" | grep -v "portainer_agent" | awk '{print $1}')
+    if [ -n "$CONTAINERS" ]; then
+        docker stop $CONTAINERS || true
+        docker rm -f $CONTAINERS || true
+    else
+        echo -e "${GREEN} 沒有需要刪除的 container（portainer_agent 除外 ${RESET}"
+    fi
 
+    # 刪除所有現有 image
+    echo -e "${YELLOW} 刪除所有現有 image，排除 portainer/agent ${RESET}"
+    IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}} {{.ID}}" | \
+             grep -v "portainer/agent" | awk '{print $2}' | sort -u)
+    if [ -n "$IMAGES" ]; then
+        docker rmi -f $IMAGES || true
+    else
+        echo -e "${GREEN} 沒有可刪除的 image，排除 portainer/agent 除外 ${RESET}"
+    fi
+
+    echo -e "${YELLOW}同步 portainer container...${RESET}"
     if docker ps -a --format '{{.Names}}' | grep -w portainer_agent >/dev/null 2>&1; then
         echo -e "${YELLOW}portainer_agent container 已存在，先移除再重建...${RESET}"
         docker rm -f portainer_agent || error_exit "無法移除舊的 portainer_agent container"
@@ -260,93 +312,23 @@ download_container_nginx_clean_for_volume(){
     echo -e "${GREEN}設置完成！${RESET}"
 }
 
-#===========================MODE======================================
+# 主程式
+echo -e "${GREEN}開始安裝節點模式！${RESET}"
+check_selinux
+change_yum_repos
+preinstall_yum
+disable_firewalld
+install_python
+install_docker
+sync_portainer
+clean_docker_log
+download_container_nginx_clean_for_volume
+echo -e "${GREEN}已完成預安裝！${RESET}"
+echo -e "${GREEN}稍後5秒測試IP建站連通性！${RESET}"
+sleep 5
 
-# mode-安裝節點
-install_cdnfly_node_mode(){
-    check_selinux
-    change_yum_repos
-    preinstall_yum
-    disable_firewalld
-    install_python
-    install_docker
-    sync_portainer
-    clean_docker_log
-    download_container_nginx_clean_for_volume
-    install_lnms
-}
+# 上線
+bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/https_test.sh)
 
-# mode-僅安裝 Docker
-only_install_docker_mode(){
-    check_selinux
-    change_yum_repos
-    preinstall_yum
-    install_docker
-}
-
-# mode-安裝 Docker 及 Portainer模式
-install_docker_portainer_mode(){
-    check_selinux
-    change_yum_repos
-    preinstall_yum
-    disable_firewalld
-    install_docker
-    sync_portainer
-}
-
-#===========================BRANCH=====================================
-
-# branch-安裝節點
-install_cdnfly_node_branch(){
-    echo -e "${YELLOW}已選擇安裝節點模式！${RESET}"
-    install_cdnfly_node_mode
-    echo -e "${GREEN}模式所有安裝步驟執行完成！${RESET}"
-}
-
-# branch-安裝docker
-install_docker_branch(){
-    echo "1. 僅安裝 Docker模式"
-    echo "2. 安裝 Docker 及 Portainer模式"
-    read mode2
-
-    if [ $mode2 -eq 1 ]
-    then
-        echo -e "${YELLOW}已選擇僅安裝 Docker 模式！${RESET}"
-        only_install_docker_mode
-        echo -e "${GREEN}模式所有安裝步驟執行完成！${RESET}"
-    elif [ $mode2 -eq 2 ]
-    then
-        echo -e "${YELLOW}已選擇安裝 Docker 及 Portainer 模式！${RESET}"
-        install_docker_portainer_mode
-        echo -e "${GREEN}模式所有安裝步驟執行完成！${RESET}"
-    else
-        echo -e "${RED}無效的模式執行！${RESET}"
-    fi
-}
-
-#===========================MASTER====================================
-
-# master-主程式
-echo "請選擇分支:"
-echo "1. 安裝節點"
-echo "2. 非安裝節點(docker、portainer)"
-read mode
-
-# 執行主幹內容，根據分支執行相關程式
-if [ $mode -eq 1 ]
-then
-    echo -e "${YELLOW}已選擇安裝節點分支！${RESET}"
-    install_cdnfly_node_branch
-    echo -e "${GREEN}分支所有安裝步驟執行完成！${RESET}"
-    docker ps -a
-    hostname -I
-elif [ $mode -eq 2 ]
-then
-    echo -e "${YELLOW}已選擇非安裝節點(docker、portainer)分支！${RESET}"
-    install_docker_branch
-    echo -e "${GREEN}分支所有安裝步驟執行完成！${RESET}"
-    docker ps -a
-    hostname -I
-else
-    echo -e "${RED}無效的分支！${RESET}"
-fi
+# 離線
+# bash /root/https_test.sh
