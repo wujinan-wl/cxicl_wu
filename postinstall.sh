@@ -24,113 +24,112 @@ POST_SCRIPTS=(
 # 狀態記錄，總結用
 declare -A STATUS
 
+# 平台清單 # NEW
+PLATFORMS=(
+    "CDNMASTER"
+    "CDNMASTER02"
+    "CDNVIP"
+    "CDNVIP01"
+    "CDNVIP02"
+    "CDNVIP03"
+    "CDNVIP04"
+    "CDNVIP05"
+    "CDNVIP06"
+)
+
 # 統一錯誤處理
 error_exit() {
     echo -e "${RED}錯誤：$1${RESET}"
     exit 1
 }
 
-# 安裝python：安裝python2.7及其pip套件
+# 安裝python
 install_python() {
     echo -e "${YELLOW}安裝 Python 2.7 及 pip...${RESET}"
-
-    # 安裝python (阿里雲yum預設python版本為2.7)
     if ! command -v python2.7 >/dev/null 2>&1; then
         yum install -y python2 || error_exit "安裝 python2 失敗"
     else
         echo -e "${GREEN}Python 2.7 已存在，略過安裝${RESET}"
     fi
 
-    # 手動配置python 2.7適配的pip2
     if ! command -v pip2 >/dev/null 2>&1; then
         curl -O https://bootstrap.pypa.io/pip/2.7/get-pip.py || error_exit "下載 get-pip.py 失敗"
-        python2.7 get-pip.py || {
-            echo -e "${RED}安裝 pip2 失敗${RESET}"
-            echo -e "${YELLOW}請通知飛書客服組群組${RESET}"
-            exit 1
-        }
+        python2.7 get-pip.py || { echo -e "${RED}安裝 pip2 失敗${RESET}"; exit 1; }
         rm -f get-pip.py
         echo -e "${GREEN}pip2 安裝完成${RESET}"
     else
         echo -e "${GREEN}pip2 已存在，略過安裝${RESET}"
     fi
 
-    # pip2 (requests、netaddr、PyJWT)套件
-    pip2 install requests netaddr  PyJWT==1.7.1|| { echo -e "${RED}安裝 python + pip2 失敗${RESET}"; exit 1; }
+    pip2 install requests netaddr PyJWT==1.7.1 || { echo -e "${RED}安裝 python + pip2 失敗${RESET}"; exit 1; }
 }
 
 # 安裝 LibreNMS
 install_lnms() {
     echo -e "${YELLOW}下載 LibreNMS 安裝腳本...${RESET}"
-
-    # 上線
     wget -O /root/add_LibreNMS_device.py ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/LibreNMS/add_LibreNMS_device.py
-
     chmod +x /root/add_LibreNMS_device.py
     python /root/add_LibreNMS_device.py
     rm -rf /root/add_LibreNMS_device.py
     echo
     echo -e "${YELLOW}LNMS監控安裝 未執行成功的話節點也能正常同步節點${RESET}"
-    echo -e "${GREEN}RAK機器安裝LNMS監控失敗是正常的${RESET}"
     echo -e "${GREEN}LibreNMS 安裝處理完成（成功或已跳過）${RESET}"
 }
 
-# 確認是否安裝librenms
-collect_user_input_lnms(){
-    # 主控選單
-    if whiptail --title "請選擇是否安裝lnms監控" --yesno "$CONFIRM_MSG" 5 30; then
-        install_lnms
-        echo "!!! 安裝 lnms 監控"
-    else
-        echo "!!! 未安裝 lnms 監控"
-    fi
-}
-
-# 收集使用者輸入資訊並寫入 JSON
-collect_user_input() {
+# NEW: 一次性收集 LNMS 選擇與平台資訊
+collect_all_user_input() {
     mkdir -p "$SAVE_PATH"
 
-    IP_LIST=$(ip -4 addr | grep inet | awk '{print $2}' | cut -d/ -f1 | grep -vE '^(127|10|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168|169\.254)\.')
+    IP_LIST=$(ip -4 addr | grep inet | awk '{print $2}' | cut -d/ -f1 | \
+        grep -vE '^(127|10|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168|169\.254)\.')
     NODE_IP=$(echo "$IP_LIST" | head -n1)
     DATE=$(date +%Y%m%d)
+    NODE_NAME="${NODE_IP}_${DATE}"
 
-    while true; do
-        NODE_NAME="${NODE_IP}_${DATE}"
+    # 問 LNMS
+    if whiptail --title "LNMS 監控安裝" \
+        --yesno "是否安裝 LNMS 監控？）" 10 60; then
+        LNMS_CHOICE="Yes"
+    else
+        LNMS_CHOICE="No"
+    fi
 
-        # 主控選單
-        PLATFORM=$(whiptail --title "Excalibur && Stella" --menu "請選擇上節點的主控：" 20 60 12 \
-            "CDNMASTER"  "" \
-            "CDNMASTER02" "" \
-            "CDNVIP"     "" \
-            "CDNVIP01"   "" \
-            "CDNVIP02"   "" \
-            "CDNVIP03"   "" \
-            "CDNVIP04"   "" \
-            "CDNVIP05"   "" \
-            "CDNVIP06"   "" \
-            "退出"       "" 3>&1 1>&2 2>&3)
+    # 主控平台選單
+    MENU_ITEMS=()
+    for p in "${PLATFORMS[@]}"; do
+        MENU_ITEMS+=("$p" "")
+    done
+    MENU_ITEMS+=("退出    -->" "取消安裝")
 
-        if [ $? -ne 0 ] || [ "$PLATFORM" == "退出" ]; then
-            echo "!!! 使用者選擇退出"
-            return 1
-        fi
+    PLATFORM=$(whiptail --title "選擇 Portainer 主控" \
+        --menu "請選擇上節點的主控：" 20 60 12 "${MENU_ITEMS[@]}" \
+        3>&1 1>&2 2>&3)
 
-        # 確認資訊
-        CONFIRM_MSG="請確認下列資訊是否正確：\n\n主控平台：$PLATFORM\n節點名稱：$NODE_NAME\n節點 IP：$NODE_IP\n"
-        if whiptail --title "資料確認" --yesno "$CONFIRM_MSG" 15 60; then
-            cat > "$SAVE_FILE" <<EOF
+    if [ $? -ne 0 ] || [ "$PLATFORM" == "退出" ]; then
+        echo -e "${YELLOW}✖ 使用者選擇退出${RESET}"
+        return 1
+    fi
+
+    # 確認全部資訊
+    CONFIRM_MSG="請確認以下設定：\n\n安裝 LNMS：$LNMS_CHOICE\n主控平台：$PLATFORM\n節點名稱：$NODE_NAME\n節點 IP：$NODE_IP\n"
+    if whiptail --title "資料確認" --yesno "$CONFIRM_MSG" 15 60; then
+        cat > "$SAVE_FILE" <<EOF
 {
   "platform": "$PLATFORM",
   "node_name": "$NODE_NAME",
   "node_ip": "$NODE_IP"
 }
 EOF
-            echo "!!! 資料已儲存至 $SAVE_FILE"
-            return 0
-        else
-            echo "!!! 資料未確認，請重新選擇"
+        echo -e "${GREEN}✔ 資料已儲存至 $SAVE_FILE${RESET}"
+
+        if [ "$LNMS_CHOICE" == "Yes" ]; then
+            install_lnms
         fi
-    done
+        return 0
+    else
+        echo -e "${YELLOW}↻ 資料未確認，請重新選擇${RESET}"
+        collect_all_user_input
+    fi
 }
 
 # 下載所有 postinstall python腳本
@@ -138,10 +137,7 @@ download_all_post_scripts() {
     echo -e "${YELLOW}下載所有 postinstall 腳本...${RESET}"
     for item in "${POST_SCRIPTS[@]}"; do
         IFS=" " read -r filename url <<< "$item"
-
-        # 上線
         wget -O "$SAVE_PATH/$filename" "$url"
-
         if [[ $? -ne 0 ]]; then
             echo -e "${RED}下載 ${filename} 失敗${RESET}"
             STATUS["下載_${filename}"]="${RED}✖ 失敗${RESET}"
@@ -159,7 +155,6 @@ run_post_script() {
     echo -e "${YELLOW}執行 ${filename}...${RESET}"
     python "$SAVE_PATH/$filename"
     result=$?
-
     if [[ $result -ne 0 ]]; then
         echo -e "${RED}✖ ${filename} 執行失敗（exit code: $result）${RESET}"
         STATUS["執行_${filename}"]="${RED}✖ 失敗（$result）${RESET}"
@@ -182,15 +177,12 @@ work_flow_summary() {
 # 工作流
 work_flow() {
     echo -e "${YELLOW}開始執行 Portainer post install 工作流...${RESET}"
-    
-    # 依序執行 post install 腳本
     run_post_script "portainer_register.py" || exit 1
     run_post_script "get_yaml_2_container.py" || exit 1
     run_post_script "check_container_info.py" || exit 1
     run_post_script "sync_container_2_cdnfly.py" || exit 1
-
     work_flow_summary
-    echo 
+    echo
     echo -e "${GREEN}Portainer post install 工作流執行完畢${RESET}"
     echo
     echo -e "${GREEN}請確認節點同步成功及增加子IP${RESET}"
@@ -198,21 +190,7 @@ work_flow() {
 
 # 主程式
 install_python
-collect_user_input_lnms
-while true; do
-    collect_user_input
-    RESULT=$?
-    if [ $RESULT -eq 0 ]; then
-        break
-    elif [ $RESULT -eq 1 ]; then
-        echo "!!! 使用者選擇退出"
-        exit 0
-    fi
-done
-
-# 上線
+collect_all_user_input || exit 0
 download_all_post_scripts
-
 work_flow
-rm -rf /opt/LibreNMS
 rm -rf /opt/Portainer
