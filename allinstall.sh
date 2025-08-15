@@ -17,7 +17,7 @@ RESET="\033[0m"
 # run_docker_portainer()          { bash /root/preinstall_docker_portainer.sh; }
 # run_https_test()                { bash /root/https_test.sh; }
 
-上線後既有指令/函式
+#上線後既有指令/函式
 run_preinstall()                { bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh); }
 run_postinstall()               { bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/postinstall.sh); }
 run_uninstall_all()             { bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/pt_uninstall.sh); }
