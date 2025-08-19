@@ -11,108 +11,43 @@ RED="\033[31m"
 YELLOW="\033[33m"
 RESET="\033[0m"
 
+# GitHub PAT
+NEW_SCRIPT_BASE_URL="https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main"
+
+# 目錄路徑
+REMOTE_PATH="ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54"
+SAVE_PATH="/opt/Portainer"
+
+# 遠端下載路徑:postinstall
+POST_SCRIPTS=(
+    "portainer_register.py ${REMOTE_PATH}/Portainer/portainer_register.py"
+    "get_yaml_2_container.py ${REMOTE_PATH}/Portainer/get_yaml_2_container.py"
+    "check_container_info.py ${REMOTE_PATH}/Portainer/check_container_info.py"
+    "sync_container_2_cdnfly.py ${REMOTE_PATH}/Portainer/sync_container_2_cdnfly.py"
+    "mekanism.py ${REMOTE_PATH}/Portainer/mekanism.py"
+    "cdnfly_api.json ${REMOTE_PATH}/Portainer/cdnfly_api.json"
+)
+
+# 平台清單
+PLATFORMS=(
+    "CDNMASTER"
+    "CDNMASTER02"
+    "CDNVIP"
+    "CDNVIP01"
+    "CDNVIP02"
+    "CDNVIP03"
+    "CDNVIP04"
+    "CDNVIP05"
+    "CDNVIP06"
+)
+
+# 狀態記錄，總結用
+declare -A STATUS
+
 # 統一錯誤處理
 error_exit() {
     echo -e "${RED}錯誤：$1${RESET}"
     exit 1
-}
-
-# 確認 SELinux 狀態
-check_selinux() {
-    echo -e "${YELLOW}檢查 SELinux 狀態...${RESET}"
-    sleep 1
-    if command -v getenforce >/dev/null 2>&1; then
-        STATUS=$(getenforce)
-        if [[ "$STATUS" == "Enforcing" ]]; then
-            echo -e "${YELLOW}偵測到 SELinux 為 Enforcing，將修改為 Permissive${RESET}"
-            setenforce 0 || {
-                echo -e "${RED}無法暫時關閉 SELinux${RESET}"
-                echo -e "${RED}請手動關閉或是請機房協助關閉 SELinux${RESET}"
-                exit 1
-            }
-            sed -i 's/^SELINUX=enforcing/SELINUX=permissive/g' /etc/selinux/config
-        else
-            echo -e "${GREEN}SELinux 狀態：$STATUS${RESET}"
-            sleep 2
-        fi
-    else
-        echo -e "${YELLOW}系統未安裝 SELinux，略過檢查${RESET}"
-    fi
-}
-
-#換源
-change_yum_repos() {
-    echo -e "${YELLOW}更換 yum 源...${RESET}"
-    echo -e "${YELLOW}準備更換源環境中...${RESET}"
-    sleep 5
-    bash <(curl -sSL https://linuxmirrors.cn/main.sh)
-    echo -e "${GREEN}yum 源更換完成！${RESET}"
-}
-
-# 安裝必要套件及同步時區
-preinstall_yum() {
-    echo -e "${YELLOW}準備安裝必要套件...${RESET}"
-
-    # 確認是否安裝wget
-    if ! command -v wget >/dev/null 2>&1; then
-        yum install -y wget || {
-            echo -e "${RED}安裝 wget 失敗${RESET}"
-            echo -e "${RED}請更新源或是確認 yum.repos 配置是否異常${RESET}"
-            exit 1
-        }
-    else
-        echo -e "${GREEN}wget 已存在，略過安裝${RESET}"
-        sleep 2
-    fi
-
-    # 確認是否安裝curl
-    if ! command -v curl >/dev/null 2>&1; then
-        yum install -y curl || {
-            echo -e "${RED}安裝 curl 失敗${RESET}"
-            echo -e "${RED}請更新源或是確認 yum.repos 配置是否異常${RESET}"
-        }
-    else
-        echo -e "${GREEN}curl 已存在，略過安裝${RESET}"
-        sleep 2
-    fi
-
-    # 確認是否安裝whiptail
-    if ! command -v whiptail >/dev/null 2>&1; then
-        yum install -y whiptail || {
-            echo -e "${RED}安裝 whiptail 失敗${RESET}"
-            echo -e "${RED}請更新源或是確認 yum.repos 配置是否異常${RESET}"
-        }
-    else
-        echo -e "${GREEN}whiptail 已存在，略過安裝${RESET}"
-        sleep 2
-    fi
-
-    # 確認是否安裝mtr
-    if ! command -v mtr >/dev/null 2>&1; then
-        yum install -y mtr || {
-            echo -e "${RED}安裝 mtr 失敗${RESET}"
-            echo -e "${RED}請更新源或是確認 yum.repos 配置是否異常${RESET}"
-        }
-    else
-        echo -e "${GREEN}mtr 已存在，略過安裝${RESET}"
-        sleep 2
-    fi
-
-    # 確認是否安裝ntpdate
-    if ! command -v ntpdate >/dev/null 2>&1; then
-        yum install -y ntpdate || {
-            echo -e "${RED}安裝 ntpdate 失敗${RESET}"
-            echo -e "${RED}請更新源或是確認 yum.repos 配置是否異常${RESET}"
-        }
-    else
-        echo -e "${GREEN}ntpdate 已存在，略過安裝${RESET}"
-        sleep 2
-    fi
-
-    echo -e "${YELLOW}準備同步時間...${RESET}"
-    ntpdate time.stdtime.gov.tw || { echo -e "${RED}同步時間失敗，請確認網路是否正常${RESET}"; exit 1; }
-    sleep 5
-    echo -e "${GREEN}時間同步完成！${RESET}"
 }
 
 # 處理防火牆：關閉firewalld防火牆並驗證其狀態
@@ -165,52 +100,16 @@ install_python() {
     pip2 install requests netaddr  PyJWT==1.7.1|| { echo -e "${RED}安裝 python + pip2 失敗${RESET}"; exit 1; }
 }
 
-# 安裝 Docker (指定版本)
-install_docker() {
-    echo -e "${YELLOW}準備安裝 Docker (指定版本)...${RESET}"
-
-    local DOCKER_VERSION="24.0.7-1.el7"
-
-    if command -v docker >/dev/null 2>&1; then
-        local INSTALLED_VERSION
-        INSTALLED_VERSION=$(docker --version | awk '{print $3}' | tr -d ',')
-        if [[ "$INSTALLED_VERSION" == "${DOCKER_VERSION%%-*}"* ]]; then
-            echo -e "${GREEN}Docker 已安裝版本：$INSTALLED_VERSION，符合要求，略過安裝。${RESET}"
-            return 0
-        else
-            echo -e "${YELLOW}檢測到不同版本的 Docker ($INSTALLED_VERSION)，將先移除舊版本。${RESET}"
-            yum remove -y docker docker-* || true
-        fi
-    fi
-
-    yum install -y yum-utils || {
-        echo -e "${RED}安裝 yum-utils 失敗${RESET}"
-        echo -e "${YELLOW}請確認網路或 yum 鏡像設定是否正確${RESET}"
-        exit 1
-    }
-
-    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo || {
-        echo -e "${RED}新增 Docker repo 失敗${RESET}"
-        echo -e "${YELLOW}請確認 DNS 或 download.docker.com 是否可連線${RESET}"
-        exit 1
-    }
-
-    echo -e "${YELLOW}安裝 Docker ${DOCKER_VERSION}...${RESET}"
-    yum install -y \
-        docker-ce-${DOCKER_VERSION} \
-        docker-ce-cli-${DOCKER_VERSION} \
-        containerd.io || {
-        echo -e "${RED}安裝 Docker ${DOCKER_VERSION} 失敗${RESET}"
-        echo -e "${YELLOW}請確認版本是否存在，或考慮手動更換版本${RESET}"
-        exit 1
-    }
-
-    systemctl start docker || error_exit "無法啟動 Docker"
-    systemctl enable docker || error_exit "無法設定 Docker 開機自動啟動"
-
-    local FINAL_VERSION
-    FINAL_VERSION=$(docker --version | awk '{print $3}' | tr -d ',')
-    echo -e "${GREEN}Docker ${FINAL_VERSION} 安裝完成！${RESET}"
+# 安裝 LibreNMS
+install_lnms() {
+    echo -e "${YELLOW}下載 LibreNMS 安裝腳本...${RESET}"
+    wget -O /root/add_LibreNMS_device.py ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/LibreNMS/add_LibreNMS_device.py
+    chmod +x /root/add_LibreNMS_device.py
+    python /root/add_LibreNMS_device.py
+    rm -rf /root/add_LibreNMS_device.py
+    echo
+    echo -e "${YELLOW}LNMS監控安裝 未執行成功的話節點也能正常同步節點${RESET}"
+    echo -e "${GREEN}LibreNMS 安裝處理完成（成功或已跳過）${RESET}"
 }
 
 # 同步 portainer container
@@ -312,23 +211,170 @@ download_container_nginx_clean_for_volume(){
     echo -e "${GREEN}設置完成！${RESET}"
 }
 
+# 一次性收集 LNMS 選擇與平台資訊(包含是否穿牆)
+collect_all_user_input() {
+    mkdir -p "$SAVE_PATH"
+
+    IP_LIST=$(ip -4 addr | grep inet | awk '{print $2}' | cut -d/ -f1 | \
+        grep -vE '^(127|10|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168|169\.254)\.')
+    NODE_IP=$(echo "$IP_LIST" | head -n1)
+    DATE=$(date +%Y%m%d)
+    NODE_NAME="${NODE_IP}_${DATE}"
+
+    # 問 LNMS
+    if whiptail --title "LNMS 監控安裝" \
+        --yesno "是否安裝 LNMS 監控？" 10 60; then
+        LNMS_CHOICE="Yes"
+    else
+        LNMS_CHOICE="No"
+    fi
+
+    # 問 穿牆
+    if whiptail --title "GOGO 穿牆安裝" \
+        --yesno "是否安裝 GOGO 穿牆？" 10 60; then
+        GOGO_CHOICE="Yes"
+    else
+        GOGO_CHOICE="No"
+    fi
+
+    # 主控平台選單
+    MENU_ITEMS=()
+    for p in "${PLATFORMS[@]}"; do
+        MENU_ITEMS+=("$p" "")
+    done
+    MENU_ITEMS+=("退出    -->" "取消安裝")
+
+    PLATFORM=$(whiptail --title "選擇 Portainer 主控" \
+        --menu "請選擇上節點的主控：" 20 60 12 "${MENU_ITEMS[@]}" \
+        3>&1 1>&2 2>&3)
+
+    if [ $? -ne 0 ] || [ "$PLATFORM" == "退出    -->" ]; then
+        echo -e "${YELLOW}✖ 使用者選擇退出${RESET}"
+        return 1
+    fi
+
+    if [ "$GOGO_CHOICE" == "Yes" ]; then
+        PLATFORM="${PLATFORM}-GOGO"
+    fi
+    # 去掉-GOGO
+    FORMATED_PLATFORMS=$(echo "$PLATFORM" | sed 's/-GOGO//')
+
+    # 確認全部資訊
+    CONFIRM_MSG="請確認以下設定：\n\n安裝 LNMS：$LNMS_CHOICE\n安裝 GOGO穿牆：$GOGO_CHOICE\n主控平台：$FORMATED_PLATFORMS\n節點名稱：$NODE_NAME\n節點 IP：$NODE_IP\n"
+    if whiptail --title "資料確認" --yesno "$CONFIRM_MSG" 15 60; then
+        cat > "$SAVE_PATH/user_input.json" <<EOF
+{
+  "platform": "$PLATFORM",
+  "node_name": "$NODE_NAME",
+  "node_ip": "$NODE_IP"
+}
+EOF
+        echo -e "${GREEN}資料已儲存至 $SAVE_PATH/user_input.json ${RESET}"
+
+        if [ "$LNMS_CHOICE" == "Yes" ]; then
+            install_lnms
+        fi
+    else
+        echo -e "${RED}資料未確認，請重新選擇${RESET}"
+        collect_all_user_input
+    fi
+}
+
+# 下載所有 postinstall python腳本
+download_all_post_scripts() {
+    echo -e "${YELLOW}下載所有 postinstall 腳本...${RESET}"
+    for item in "${POST_SCRIPTS[@]}"; do
+        IFS=" " read -r filename url <<< "$item"
+        wget -O "$SAVE_PATH/$filename" "$url"
+        if [[ $? -ne 0 ]]; then
+            echo -e "${RED}下載 ${filename} 失敗${RESET}"
+            # STATUS["下載_${filename}"]="${RED}✖ 失敗${RESET}"
+        else
+            chmod +x "$SAVE_PATH/$filename"
+            echo -e "${GREEN}下載並設權限：${filename}${RESET}"
+            # STATUS["下載_${filename}"]="${GREEN}✔ 成功${RESET}"
+        fi
+    done
+}
+
+# 執行單一腳本
+run_post_script() {
+    filename=$1
+    echo -e "${YELLOW}執行 ${filename}...${RESET}"
+    python "$SAVE_PATH/$filename"
+    result=$?
+    if [[ $result -ne 0 ]]; then
+        echo -e "${RED}✖ ${filename} 執行失敗（exit code: $result）${RESET}"
+        STATUS["執行_${filename}"]="${RED}✖ 失敗（$result）${RESET}"
+        return 1
+    else
+        echo -e "${GREEN}✔ ${filename} 執行成功${RESET}"
+        STATUS["執行_${filename}"]="${GREEN}✔ 成功${RESET}"
+        return 0
+    fi
+}
+
+# 總結顯示
+work_flow_summary() {
+    echo -e "\n${YELLOW}工作流程總結：${RESET}"
+    for key in "${!STATUS[@]}"; do
+        printf "%-30s %b\n" "$key" "${STATUS[$key]}"
+    done
+}
+
+# 工作流
+work_flow() {
+    echo -e "${YELLOW}開始執行 Portainer post install 工作流...${RESET}"
+    run_post_script "portainer_register.py" || exit 1
+    run_post_script "get_yaml_2_container.py" || exit 1
+    run_post_script "check_container_info.py" || exit 1
+    run_post_script "sync_container_2_cdnfly.py" || exit 1
+    work_flow_summary
+    echo
+    echo -e "${GREEN}Portainer post install 工作流執行完畢${RESET}"
+    echo
+    echo -e "${GREEN}請確認節點同步成功及增加子IP${RESET}"
+}
+
+#==========================================================================================================
 # 主程式
-echo -e "${GREEN}開始安裝節點模式！${RESET}"
-check_selinux
-change_yum_repos
-preinstall_yum
-disable_firewalld
-install_python
-install_docker
-sync_portainer
-clean_docker_log
-download_container_nginx_clean_for_volume
-echo -e "${GREEN}已完成預安裝！${RESET}"
-echo -e "${GREEN}稍後5秒測試IP建站連通性！${RESET}"
-sleep 5
+#==========================================================================================================
 
-# 上線
-bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/https_test.sh)
+# https_test
+https_test_mode(){
+    echo -e "${GREEN}開始（步驟1）預安裝腳本！${RESET}"
+    bash <(curl -sSL $NEW_SCRIPT_BASE_URL/https_test.sh)
+    if whiptail --title "https 測試結果" \
+        --yesno "是否成功完成 https 測試？" 10 60; then
+        echo -e "${GREEN}https 測試成功！${RESET}"
+        echo -e "${GREEN}準備預安裝環境中！${RESET}"
+        sleep 3
+    else
+        echo -e "${RED}https 測試失敗！${RESET}"
+        exit 1
+    fi
+}
 
-# 離線
-# bash /root/https_test.sh
+# 預安裝
+preinstall_mode(){
+    disable_firewalld
+    install_python
+    collect_all_user_input || exit 0
+    sync_portainer
+    clean_docker_log
+    download_container_nginx_clean_for_volume
+    echo -e "${GREEN}已完成預安裝！${RESET}"
+    echo -e "${GREEN}稍後繼續（步驟2）事後安裝腳本${RESET}"
+    sleep 3
+}
+
+# 事後安裝
+postinstall_mode(){
+    download_all_post_scripts
+    work_flow
+    rm -rf /opt/Portainer
+}
+
+https_test_mode
+preinstall_mode
+postinstall_mode
