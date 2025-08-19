@@ -7,25 +7,28 @@ YELLOW="\033[33m";
 RED="\033[31m"; 
 RESET="\033[0m"
 
-# # 離線既有指令/函式
-# run_preinstall()                { bash /root/preinstall.sh; }
-# run_postinstall()               { bash /root/postinstall.sh; }
-# run_uninstall_all()             { bash /root/pt_uninstall.sh; }
-# run_legacy_install()            { collect_user_input_old_install; }
-# run_legacy_uninstall()          { wget ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/agent_uninstall.sh && chmod +x agent_uninstall.sh && mv agent_uninstall.sh /opt/agent_uninstall.sh && bash /opt/agent_uninstall.sh; }
-# run_only_docker()               { bash /root/preinstall_only_docker.sh; }
-# run_docker_portainer()          { bash /root/preinstall_docker_portainer.sh; }
-# run_https_test()                { bash /root/https_test.sh; }
+# 上線後新安裝
+NEW_SCRIPT_BASE_URL="https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main"
+run_preinstall()       { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/preinstall.sh); }
+run_uninstall_all()    { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/pt_uninstall.sh); }
+run_only_docker()      { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/preinstall_only_docker.sh); }
+run_docker_portainer() { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/preinstall_docker_portainer.sh); }
+run_https_test()       { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/https_test.sh); }
 
-#上線後既有指令/函式
-run_preinstall()                { bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh); }
-run_postinstall()               { bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/postinstall.sh); }
-run_uninstall_all()             { bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/pt_uninstall.sh); }
-run_legacy_install()            { collect_user_input_old_install; }
-run_legacy_uninstall()          { wget ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/agent_uninstall.sh && chmod +x agent_uninstall.sh && mv agent_uninstall.sh /opt/agent_uninstall.sh && bash /opt/agent_uninstall.sh; }
-run_only_docker()               { bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall_only_docker.sh); }
-run_docker_portainer()          { bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall_docker_portainer.sh); }
-run_https_test()                { bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/https_test.sh); }
+# 舊安裝
+run_legacy_install()   { collect_user_input_old_install; }
+run_legacy_uninstall() { wget ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/agent_uninstall.sh && chmod +x agent_uninstall.sh && mv agent_uninstall.sh /opt/agent_uninstall.sh && bash /opt/agent_uninstall.sh; }
+
+# 統一的完成提示
+pause_choice() {
+  local msg="${1:-已完成，請選擇後續動作}"
+  if whiptail --backtitle "Excalibur && Stella" --title "完成" \
+      --yesno "$msg\n\nYes = 返回選單\nNo = 結束腳本" 12 60; then
+    return 0   # Yes → 返回選單
+  else
+    exit 0     # No → 結束腳本
+  fi
+}
 
 # 舊安裝方法
 collect_user_input_old_install() {
@@ -65,23 +68,31 @@ collect_user_input_old_install() {
     if [[ -n "${CMD_MAP[$PLATFORM]}" ]]; then
       echo -e "${GREEN}開始部署：$PLATFORM${RESET}"
       eval "${CMD_MAP[$PLATFORM]}"
+      pause_choice "舊版安裝流程已執行完成。"
     else
       echo -e "${RED}未知主控：$PLATFORM${RESET}"
+      pause_choice "未知主控：$PLATFORM"
     fi
   fi
 }
 
 # 分組子選單
-menu_install() {
+menu_install_remove() {
   while true; do
     CH=$(whiptail --backtitle "Excalibur && Stella" \
       --title "安裝流程" --menu "選擇安裝步驟" 18 70 8 \
-      "1" "（步驟1）預安裝腳本" \
-      "2" "（步驟2）事後安裝腳本" \
+      "1" "（新）安裝腳本" \
+      "2" "（新）卸載腳本" \
       "B" "返回主選單" 3>&1 1>&2 2>&3) || return
     case "$CH" in
-      1) run_preinstall ;;
-      2) run_postinstall ;;
+      1)
+        run_preinstall
+        pause_choice "安裝腳本已完成。"
+        ;;
+      2)
+        run_uninstall_all
+        pause_choice "卸載腳本已完成。"
+        ;;
       B) return ;;
     esac
   done
@@ -95,8 +106,14 @@ menu_legacy() {
       "R" "（舊）卸載節點" \
       "B" "返回主選單" 3>&1 1>&2 2>&3) || return
     case "$CH" in
-      A) run_legacy_install ;;
-      R) run_legacy_uninstall ;;
+      A)
+        run_legacy_install
+        pause_choice "（舊）安裝節點流程已完成。"
+        ;;
+      R)
+        run_legacy_uninstall
+        pause_choice "（舊）卸載節點流程已完成。"
+        ;;
       B) return ;;
     esac
   done
@@ -111,18 +128,21 @@ menu_tools() {
       "H" "安裝 https_test" \
       "B" "返回主選單" 3>&1 1>&2 2>&3) || return
     case "$CH" in
-      D) run_only_docker ;;
-      P) run_docker_portainer ;;
-      H) run_https_test ;;
+      D)
+        run_only_docker
+        pause_choice "僅安裝 Docker 已完成。"
+        ;;
+      P)
+        run_docker_portainer
+        pause_choice "安裝 Docker + Portainer 已完成。"
+        ;;
+      H)
+        run_https_test
+        pause_choice "https_test 已完成。"
+        ;;
       B) return ;;
     esac
   done
-}
-
-menu_remove() {
-  whiptail --backtitle "Excalibur && Stella" --title "卸載提示" \
-    --yesno "此動作會卸載節點及 Portainer（請先處理 CDN 線路組）。\n確定要繼續？" 12 70 \
-    && run_uninstall_all
 }
 
 # 主選單：只放分組
@@ -130,17 +150,15 @@ main_menu() {
   while true; do
     SEL=$(whiptail --backtitle "Excalibur && Stella" \
       --title "主選單" --menu "請選擇動作分類" 20 78 10 \
-      "1" "安裝流程（步驟 1→2）" \
-      "2" "舊版安裝/卸載" \
+      "1" "（新版PT）節點安裝 / 卸載" \
+      "2" "（舊版）節點安裝 / 卸載" \
       "3" "小工具（Docker/Portainer/https_test）" \
-      "4" "卸載（節點 + Portainer）" \
       "Q" "退出" 3>&1 1>&2 2>&3) || exit 1
 
     case "$SEL" in
-      1) menu_install ;;
+      1) menu_install_remove ;;
       2) menu_legacy  ;;
       3) menu_tools   ;;
-      4) menu_remove  ;;
       Q) exit 0       ;;
     esac
   done
