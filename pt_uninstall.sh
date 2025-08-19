@@ -118,6 +118,10 @@ remove_lnms() {
     echo -e "${GREEN} 全都處理完成，可通知機房下架 ${RESET}"
 }
 
+# 主程式
+whiptail --backtitle "Excalibur && Stella" --title "卸載提示" \
+    --yesno "此動作會卸載節點及 Portainer（請先處理 CDN 線路組）。\n確定要繼續？" 12 70 \
+    && run_uninstall_all
 install_python
 docker_stop_and_remove_containers_other
 docker_remove_images_other
