@@ -42,7 +42,10 @@ create_dir(){
     echo -e "${YELLOW}建立主目錄：$MAIN_DIR${RESET}"
     mkdir -p "$WORKDIR" # 建立工作目錄
     sleep 2
+
+    #上線
     wget -O /root/https_test_data.tar.gz "ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/https_test/https_test_data.tar.gz"
+    
     mv /root/https_test_data.tar.gz $MAIN_DIR/
     tar -xzvf $MAIN_DIR/https_test_data.tar.gz -C $MAIN_DIR/
 }
@@ -125,12 +128,10 @@ test_remove() {
     docker rm -f $CONTAINER_NAME 2>/dev/null || true
     docker rmi nginx:alpine 2>/dev/null || true
     rm -rf /opt/https_test 2>/dev/null || true
-    echo
-    echo -e "${GREEN}請按Enter 繼續後續執行事項${RESET}"
-    read
 }
 
 # 主程式
+bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall_only_docker.sh)
 create_dir
 create_ssl_cert
 create_nginx_conf
@@ -138,10 +139,4 @@ create_ip_test_web
 docker_run
 output_test_list
 test_remove
-
-# 上線
-bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/allinstall.sh)
-
-# 離線
-# bash /root/allinstall.sh
 
