@@ -118,17 +118,25 @@ remove_lnms() {
     echo -e "${GREEN} 全都處理完成，可通知機房下架 ${RESET}"
 }
 
+run_uninstall_all() {
+    install_python
+    docker_stop_and_remove_containers_other
+    docker_remove_images_other
+    delete_portainer
+    remove_lnms
+    rm -rf /opt/https_test
+    rm -rf /opt/Portainer
+    rm -rf /opt/LibreNMS
+    rm -f /root/remove_LibreNMS_device.py
+    rm -f /root/add_LibreNMS_device.py
+    rm -f /root/remove_pt_enviroment.py
+}
+
 # 主程式
-whiptail --backtitle "Excalibur && Stella" --title "卸載提示" \
-    --yesno "此動作會卸載節點及 Portainer（請先處理 CDN 線路組）。\n確定要繼續？" 12 70 \
-    && run_uninstall_all
-install_python
-docker_stop_and_remove_containers_other
-docker_remove_images_other
-delete_portainer
-remove_lnms
-rm -rf /opt/https_test
-rm -rf /opt/Portainer
-rm -f /root/remove_LibreNMS_device.py
-rm -f /root/add_LibreNMS_device.py
-rm -f /root/remove_pt_enviroment.py
+if whiptail --backtitle "Excalibur && Stella" --title "卸載提示" \
+    --yesno $'此動作會卸載節點及 Portainer（請先處理 CDN 線路組）。\n確定要繼續？' 12 70; then
+    run_uninstall_all
+else
+    echo -e "${RED}卸載已取消。${RESET}"
+    exit 1
+fi
