@@ -35,15 +35,6 @@ check_selinux() {
     fi
 }
 
-#換源
-change_yum_repos() {
-    echo -e "${YELLOW}更換 yum 源...${RESET}"
-    echo -e "${YELLOW}準備更換源環境中...${RESET}"
-    sleep 5
-    bash <(curl -sSL https://linuxmirrors.cn/main.sh)
-    echo -e "${GREEN}yum 源更換完成！${RESET}"
-}
-
 # 安裝必要套件及同步時區
 preinstall_yum() {
     echo -e "${YELLOW}準備安裝必要套件...${RESET}"
@@ -231,7 +222,6 @@ sync_portainer(){
 # 主程式
 echo -e "${YELLOW}已選擇安裝 Docker 及 Portainer 模式！${RESET}"
 check_selinux
-change_yum_repos
 preinstall_yum
 disable_firewalld
 install_docker
