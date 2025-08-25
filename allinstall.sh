@@ -14,19 +14,29 @@ run_uninstall_all()    { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/pt_uninstall.sh);
 run_only_docker()      { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/preinstall_only_docker.sh); }
 run_docker_portainer() { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/preinstall_docker_portainer.sh); }
 run_https_test()       { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/https_test.sh); }
+run_ping_tools()       { bash <(curl -sSL https://raw.githubusercontent.com/cxhil-yixian/Ping_tools/main/install_ping_tools.sh); }
 
 # 舊安裝
 run_legacy_install()   { collect_user_input_old_install; }
 run_legacy_uninstall() { wget ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/agent_uninstall.sh && chmod +x agent_uninstall.sh && mv agent_uninstall.sh /opt/agent_uninstall.sh && bash /opt/agent_uninstall.sh; }
 
+# 換源
+change_yum_repos() {
+    echo -e "${YELLOW}更換 yum 源...${RESET}"
+    echo -e "${YELLOW}準備更換源環境中...${RESET}"
+    sleep 5
+    bash <(curl -sSL https://linuxmirrors.cn/main.sh)
+    echo -e "${GREEN}yum 源更換完成！${RESET}"
+}
+
 # 統一的完成提示
 pause_choice() {
   local msg="${1:-已完成，請選擇後續動作}"
   if whiptail --backtitle "Excalibur && Stella" --title "完成" \
-      --yesno "$msg\n\nYes = 返回選單\nNo = 結束腳本" 12 60; then
-    return 0   # Yes → 返回選單
+      --yesno "$msg\n\nYes = 結束腳本\nNo = 返回選單" 12 60; then
+      exit 0     # No → 結束腳本
   else
-    exit 0     # No → 結束腳本
+      return 0   # Yes → 返回選單
   fi
 }
 
@@ -126,6 +136,7 @@ menu_tools() {
       "D" "僅安裝 Docker" \
       "P" "僅安裝 Docker + Portainer" \
       "H" "安裝 https_test" \
+      "T" "安裝 ping_tools" \
       "B" "返回主選單" 3>&1 1>&2 2>&3) || return
     case "$CH" in
       D)
@@ -140,6 +151,10 @@ menu_tools() {
         run_https_test
         pause_choice "https_test 已完成。"
         ;;
+      T)
+        run_ping_tools
+        pause_choice "ping_tools 已完成。"
+        ;;
       B) return ;;
     esac
   done
@@ -152,7 +167,7 @@ main_menu() {
       --title "主選單" --menu "請選擇動作分類" 20 78 10 \
       "1" "（新版PT）節點安裝 / 卸載" \
       "2" "（舊版）節點安裝 / 卸載" \
-      "3" "小工具（Docker/Portainer/https_test）" \
+      "3" "小工具（Docker/Portainer/https_test/ping_tools）" \
       "Q" "退出" 3>&1 1>&2 2>&3) || exit 1
 
     case "$SEL" in
@@ -164,4 +179,7 @@ main_menu() {
   done
 }
 
+# 主程式
+change_yum_repos
+yum install -y newt
 main_menu
