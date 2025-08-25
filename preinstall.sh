@@ -141,6 +141,10 @@ sync_portainer(){
         docker rm -f portainer_agent || error_exit "無法移除舊的 portainer_agent container"
     fi
 
+    systemctl restart docker
+    echo -e "${YELLOW}等待 Docker 服務重啟完成...${RESET}"
+    sleep 3
+
     docker run -d \
         -p 9101:9001 \
         --name portainer_agent \
@@ -332,8 +336,58 @@ work_flow() {
     work_flow_summary
     echo
     echo -e "${GREEN}Portainer post install 工作流執行完畢${RESET}"
-    echo
-    echo -e "${GREEN}請確認節點同步成功及增加子IP${RESET}"
+}
+
+# 建立一次性排程更新 Docker images 到 cron
+others_images_cron(){
+    echo -e "${YELLOW}建立一次性 Docker images 更新任務...${RESET}"
+    LOG_FILE="/var/log/docker_images_update_once.log"
+    LOCK_FILE="/var/lock/docker_pull.lock"
+
+    # 準備 log 與 lock 目錄/檔案
+    mkdir -p /var/log /var/lock
+    touch "$LOG_FILE"
+    chmod 644 "$LOG_FILE"
+
+    # 各時段(凌晨2 ~ 5)的 Docker pull 命令組
+    declare -A CMD_GROUPS
+    CMD_GROUPS[2]="docker pull --max-bandwidth=3MB wujinan/cdn:cdnmaster-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnmaster02-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip01-agent-1.0.0"
+
+    CMD_GROUPS[3]="docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip02-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip03-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip04-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip05-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip06-agent-1.0.0"
+
+    CMD_GROUPS[4]="docker pull --max-bandwidth=3MB wujinan/cdn:cdnmaster-gogo-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnmaster02-gogo-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip-gogo-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip01-gogo-agent-1.0.0"
+
+    CMD_GROUPS[5]="docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip02-gogo-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip03-gogo-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip04-gogo-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip05-gogo-agent-1.0.0 && \
+docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip06-gogo-agent-1.0.0"
+
+    tmp_cron="/tmp/cron_$$"
+    crontab -l 2>/dev/null > "$tmp_cron" || true
+
+    for HOUR in 2 3 4 5; do
+        CMDS="${CMD_GROUPS[$HOUR]}"
+        echo "0 $HOUR * * * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; ( \
+/usr/bin/flock -n $LOCK_FILE -c \"echo '===== \$(/bin/date '+\\%F \\%T') 組${HOUR} 開始 =====' >> $LOG_FILE; \
+$CMDS >> $LOG_FILE 2>&1; \
+echo '===== \$(/bin/date '+\\%F \\%T') 組${HOUR} 結束 =====' >> $LOG_FILE; \
+crontab -l | /bin/grep -v docker_images_update_once_group${HOUR} | crontab -\" \
+) # docker_images_update_once_group${HOUR}" >> "$tmp_cron"
+    done
+
+    crontab "$tmp_cron" && rm -f "$tmp_cron"
+    echo -e "${GREEN}已建立一次性 Docker images 更新任務（含 flock 與 PATH/LOG 初始化）。${RESET}"
 }
 
 #==========================================================================================================
@@ -373,8 +427,20 @@ postinstall_mode(){
     download_all_post_scripts
     work_flow
     rm -rf /opt/Portainer
+    others_images_cron
 }
 
-https_test_mode
+# 主程式
+CONFIRM_MSG_=$'確認是否開始IP測試https架站\n\n若不確定IP是否可用或是【初次安裝節點】 -> YES\n若已經確定IP可用 -> NO'
+if whiptail --backtitle "Excalibur && Stella" --title "IP測試https架站" \
+    --yesno "$CONFIRM_MSG_" 12 70; then
+    https_test_mode
+else
+    echo -e "${YELLOW}跳過IP測試https架站！${RESET}"
+    bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall_only_docker.sh)
+fi
+
 preinstall_mode
 postinstall_mode
+echo -e "${YELLOW}記得確認【節點同步】、【修改節點名子】、【增加子IP】！${RESET}"
+echo -e "${YELLOW}若選擇【穿牆版本】，記得用小工具裝GOGO穿牆${RESET}"
