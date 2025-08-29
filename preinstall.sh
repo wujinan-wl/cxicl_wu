@@ -338,57 +338,60 @@ work_flow() {
     echo -e "${GREEN}Portainer post install 工作流執行完畢${RESET}"
 }
 
-# 建立一次性排程更新 Docker images 到 cron
-others_images_cron(){
-    echo -e "${YELLOW}建立一次性 Docker images 更新任務...${RESET}"
-    LOG_FILE="/var/log/docker_images_update_once.log"
-    LOCK_FILE="/var/lock/docker_pull.lock"
+# 建立固定排程：02:00 起每 10 分鐘拉 1 個 Docker image（無分組、無 lock）
+others_images_cron_once() {
+    echo "建立一次性 Docker images 拉取任務（02:00 起每 10 分鐘 1 個，執行後自刪）..."
 
-    # 準備 log 與 lock 目錄/檔案
-    mkdir -p /var/log /var/lock
+    LOG_FILE="/var/log/docker_images_pull.log"
+    mkdir -p /var/log
     touch "$LOG_FILE"
     chmod 644 "$LOG_FILE"
 
-    # 各時段(凌晨2 ~ 5)的 Docker pull 命令組
-    declare -A CMD_GROUPS
-    CMD_GROUPS[2]="docker pull --max-bandwidth=3MB wujinan/cdn:cdnmaster-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnmaster02-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip01-agent-1.0.0"
-
-    CMD_GROUPS[3]="docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip02-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip03-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip04-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip05-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip06-agent-1.0.0"
-
-    CMD_GROUPS[4]="docker pull --max-bandwidth=3MB wujinan/cdn:cdnmaster-gogo-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnmaster02-gogo-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip-gogo-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip01-gogo-agent-1.0.0"
-
-    CMD_GROUPS[5]="docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip02-gogo-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip03-gogo-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip04-gogo-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip05-gogo-agent-1.0.0 && \
-docker pull --max-bandwidth=3MB wujinan/cdn:cdnvip06-gogo-agent-1.0.0"
+    IMAGES=(
+      "wujinan/cdn:cdnmaster-agent-1.0.0"
+      "wujinan/cdn:cdnmaster02-agent-1.0.0"
+      "wujinan/cdn:cdnvip-agent-1.0.0"
+      "wujinan/cdn:cdnvip01-agent-1.0.0"
+      "wujinan/cdn:cdnvip02-agent-1.0.0"
+      "wujinan/cdn:cdnvip03-agent-1.0.0"
+      "wujinan/cdn:cdnvip04-agent-1.0.0"
+      "wujinan/cdn:cdnvip05-agent-1.0.0"
+      "wujinan/cdn:cdnvip06-agent-1.0.0"
+      "wujinan/cdn:cdnmaster-gogo-agent-1.0.0"
+      "wujinan/cdn:cdnmaster02-gogo-agent-1.0.0"
+      "wujinan/cdn:cdnvip-gogo-agent-1.0.0"
+      "wujinan/cdn:cdnvip01-gogo-agent-1.0.0"
+      "wujinan/cdn:cdnvip02-gogo-agent-1.0.0"
+      "wujinan/cdn:cdnvip03-gogo-agent-1.0.0"
+      "wujinan/cdn:cdnvip04-gogo-agent-1.0.0"
+      "wujinan/cdn:cdnvip05-gogo-agent-1.0.0"
+      "wujinan/cdn:cdnvip06-gogo-agent-1.0.0"
+    )
 
     tmp_cron="/tmp/cron_$$"
-    crontab -l 2>/dev/null > "$tmp_cron" || true
+    crontab -l 2>/dev/null | grep -v '# docker_image_pull_' > "$tmp_cron" || true
 
-    for HOUR in 2 3 4 5; do
-        CMDS="${CMD_GROUPS[$HOUR]}"
-        echo "0 $HOUR * * * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; ( \
-/usr/bin/flock -n $LOCK_FILE -c \"echo '===== \$(/bin/date '+\\%F \\%T') 組${HOUR} 開始 =====' >> $LOG_FILE; \
-$CMDS >> $LOG_FILE 2>&1; \
-echo '===== \$(/bin/date '+\\%F \\%T') 組${HOUR} 結束 =====' >> $LOG_FILE; \
-crontab -l | /bin/grep -v docker_images_update_once_group${HOUR} | crontab -\" \
-) # docker_images_update_once_group${HOUR}" >> "$tmp_cron"
+    start_total_min=120  # 02:00
+    idx=0
+    for IMAGE in "${IMAGES[@]}"; do
+        total=$(( start_total_min + idx * 10 ))
+        hour=$(( (total / 60) % 24 ))
+        min=$(( total % 60 ))
+        tag="docker_image_pull_${idx}"
+
+        printf "%d %d * * * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; " "$min" "$hour" >> "$tmp_cron"
+        printf "/bin/echo '===== \$(/bin/date '+\\%%F \\%%T') pull %s =====' >> %s 2>&1; " "$IMAGE" "$LOG_FILE" >> "$tmp_cron"
+        printf "/usr/bin/docker pull %s >> %s 2>&1; " "$IMAGE" "$LOG_FILE" >> "$tmp_cron"
+        # 自刪
+        printf "crontab -l | grep -v %s | crontab - # %s\n" "$tag" "$tag" >> "$tmp_cron"
+
+        idx=$((idx + 1))
     done
 
     crontab "$tmp_cron" && rm -f "$tmp_cron"
-    echo -e "${GREEN}已建立一次性 Docker images 更新任務（含 flock 與 PATH/LOG 初始化）。${RESET}"
+    echo "已建立 ${#IMAGES[@]} 條一次性 cron，會自刪。Log：$LOG_FILE"
 }
+
 
 #==========================================================================================================
 # 主程式
