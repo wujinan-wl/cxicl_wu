@@ -72,7 +72,7 @@ create_nginx_conf() {
     http {
         server {
             listen 443 ssl;
-            server_name localhost;
+            server_name _;
 
             ssl_certificate     /etc/nginx/certs/selfsigned.crt;
             ssl_certificate_key /etc/nginx/certs/selfsigned.key;
@@ -131,6 +131,15 @@ test_remove() {
 }
 
 # 主程式
+echo -e "${YELLOW}是否更換源(repo)?${RESET}"
+read -p "y/N: " change_repo
+if [[ "$change_repo" == "Y" || "$change_repo" == "y" ]]; then
+    sleep 2
+    bash <(curl -sSL https://linuxmirrors.cn/main.sh)
+else
+    echo -e "${GREEN}不更換源。${RESET}"
+fi
+yum install -y newt
 bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall_only_docker.sh)
 create_dir
 create_ssl_cert
@@ -139,4 +148,3 @@ create_ip_test_web
 docker_run
 output_test_list
 test_remove
-
