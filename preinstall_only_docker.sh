@@ -63,8 +63,8 @@ preinstall_yum() {
     fi
 
     # 確認是否安裝whiptail
-    if ! command -v whiptail >/dev/null 2>&1; then
-        yum install -y whiptail || {
+    if ! command -v newt >/dev/null 2>&1; then
+        yum install -y newt || {
             echo -e "${RED}安裝 whiptail 失敗${RESET}"
             echo -e "${RED}請更新源或是確認 yum.repos 配置是否異常${RESET}"
         }
