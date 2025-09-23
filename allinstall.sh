@@ -18,11 +18,10 @@ run_https_test()       { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/https_test.sh); }
 # 舊安裝
 run_legacy_install()   { collect_user_input_old_install; }
 run_legacy_uninstall() { 
-  wget ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/agent_uninstall.sh && 
+  wget ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/agent_uninstall.sh &&  
   chmod +x agent_uninstall.sh && 
   mv agent_uninstall.sh /opt/agent_uninstall.sh && 
-  bash /opt/agent_uninstall.sh &&
-  
+  bash /opt/agent_uninstall.sh
 }
 
 # 換源
