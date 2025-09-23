@@ -318,14 +318,6 @@ run_post_script() {
     fi
 }
 
-# 總結顯示
-work_flow_summary() {
-    echo -e "\n${YELLOW}工作流程總結：${RESET}"
-    for key in "${!STATUS[@]}"; do
-        printf "%-30s %b\n" "$key" "${STATUS[$key]}"
-    done
-}
-
 # 工作流
 work_flow() {
     echo -e "${YELLOW}開始執行 Portainer post install 工作流...${RESET}"
@@ -333,14 +325,13 @@ work_flow() {
     run_post_script "get_yaml_2_container.py" || exit 1
     run_post_script "check_container_info.py" || exit 1
     run_post_script "sync_container_2_cdnfly.py" || exit 1
-    work_flow_summary
     echo
     echo -e "${GREEN}Portainer post install 工作流執行完畢${RESET}"
 }
 
-# 建立固定排程：02:00 起每 10 分鐘拉 1 個 Docker image（無分組、無 lock）
+# 建立固定排程：02:00 起每 30 分鐘拉 1 個 Docker image（無分組、無 lock）
 others_images_cron_once() {
-    echo "建立一次性 Docker images 拉取任務（02:00 起每 10 分鐘 1 個，執行後自刪）..."
+    echo "建立一次性 Docker images 拉取任務（02:00 起每 30 分鐘 1 個，執行後自刪）..."
 
     LOG_FILE="/var/log/docker_images_pull.log"
     mkdir -p /var/log
@@ -374,16 +365,22 @@ others_images_cron_once() {
     start_total_min=120  # 02:00
     idx=0
     for IMAGE in "${IMAGES[@]}"; do
-        total=$(( start_total_min + idx * 10 ))
+        total=$(( start_total_min + idx * 30 ))
         hour=$(( (total / 60) % 24 ))
         min=$(( total % 60 ))
         tag="docker_image_pull_${idx}"
 
+        # 行首：時間欄位
         printf "%d %d * * * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; " "$min" "$hour" >> "$tmp_cron"
-        printf "/bin/echo '===== \$(/bin/date '+\\%%F \\%%T') pull %s =====' >> %s 2>&1; " "$IMAGE" "$LOG_FILE" >> "$tmp_cron"
-        printf "/usr/bin/docker pull %s >> %s 2>&1; " "$IMAGE" "$LOG_FILE" >> "$tmp_cron"
+        printf '/bin/echo "===== $(/bin/date '\''+\\%%F \\%%T'\'') pull %s =====" >> %s 2>&1; ' \
+        "$IMAGE" "$LOG_FILE" >> "$tmp_cron"
+
+        # 加 flock避免重疊執行
+        printf '/usr/bin/flock -n /var/lock/docker_pull.lock -c "/usr/bin/docker pull %s >> %s 2>&1"; ' \
+        "$IMAGE" "$LOG_FILE" >> "$tmp_cron"
+
         # 自刪
-        printf "crontab -l | grep -v %s | crontab - # %s\n" "$tag" "$tag" >> "$tmp_cron"
+        printf 'crontab -l | /bin/grep -v %s | crontab - # %s\n' "$tag" "$tag" >> "$tmp_cron"
 
         idx=$((idx + 1))
     done
@@ -429,21 +426,28 @@ preinstall_mode(){
 postinstall_mode(){
     download_all_post_scripts
     work_flow
-    rm -rf /opt/Portainer
-    others_images_cron
+    if [ $? -ne 0 ]; then # 如果work_flow回傳是exit 1，表示有失敗，不進行後續步驟
+        echo -e "${RED}事後安裝失敗！${RESET}"
+        rm -rf /opt/Portainer
+        exit 1
+    fi
+    others_images_cron_once
 }
 
 # 主程式
-CONFIRM_MSG_=$'確認是否開始IP測試https架站\n\n若不確定IP是否可用或是【初次安裝節點】 -> YES\n若已經確定IP可用 -> NO'
-if whiptail --backtitle "Excalibur && Stella" --title "IP測試https架站" \
-    --yesno "$CONFIRM_MSG_" 12 70; then
-    https_test_mode
-else
-    echo -e "${YELLOW}跳過IP測試https架站！${RESET}"
+main(){
+    # 安裝docker
     bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall_only_docker.sh)
-fi
+    docker ps >/dev/null 2>&1 || { echo -e "${RED}docker 未啟動成功！${RESET}"; exit 1; }
 
-preinstall_mode
-postinstall_mode
-echo -e "${YELLOW}記得確認【節點同步】、【修改節點名子】、【增加子IP】！${RESET}"
-echo -e "${YELLOW}若選擇【穿牆版本】，記得用小工具裝GOGO穿牆${RESET}"
+    # 安裝portainer
+    preinstall_mode
+    docker ps -a | grep portainer >/dev/null 2>&1 || { echo -e "${RED}Portainer 未啟動成功！${RESET}"; exit 1; }
+
+    # 裝容器 + 上節點
+    postinstall_mode
+    echo -e "${YELLOW}記得確認【節點同步】、【修改節點名子】、【增加子IP】！${RESET}"
+    echo -e "${YELLOW}若選擇【穿牆版本】，記得用小工具裝GOGO穿牆${RESET}"
+}
+
+main
