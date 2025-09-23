@@ -14,11 +14,16 @@ run_uninstall_all()    { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/pt_uninstall.sh);
 run_only_docker()      { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/preinstall_only_docker.sh); }
 run_docker_portainer() { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/preinstall_docker_portainer.sh); }
 run_https_test()       { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/https_test.sh); }
-run_ping_tools()       { bash <(curl -sSL https://raw.githubusercontent.com/cxhil-yixian/Ping_tools/main/install_ping_tools.sh); }
 
 # 舊安裝
 run_legacy_install()   { collect_user_input_old_install; }
-run_legacy_uninstall() { wget ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/agent_uninstall.sh && chmod +x agent_uninstall.sh && mv agent_uninstall.sh /opt/agent_uninstall.sh && bash /opt/agent_uninstall.sh; }
+run_legacy_uninstall() { 
+  wget ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/agent_uninstall.sh && 
+  chmod +x agent_uninstall.sh && 
+  mv agent_uninstall.sh /opt/agent_uninstall.sh && 
+  bash /opt/agent_uninstall.sh &&
+  
+}
 
 # 換源
 change_yum_repos() {
@@ -136,7 +141,6 @@ menu_tools() {
       "D" "僅安裝 Docker" \
       "P" "僅安裝 Docker + Portainer" \
       "H" "安裝 https_test" \
-      "T" "安裝 ping_tools" \
       "B" "返回主選單" 3>&1 1>&2 2>&3) || return
     case "$CH" in
       D)
@@ -151,10 +155,6 @@ menu_tools() {
         run_https_test
         pause_choice "https_test 已完成。"
         ;;
-      T)
-        run_ping_tools
-        pause_choice "ping_tools 已完成。"
-        ;;
       B) return ;;
     esac
   done
@@ -167,7 +167,7 @@ main_menu() {
       --title "主選單" --menu "請選擇動作分類" 20 78 10 \
       "1" "（新版PT）節點安裝 / 卸載" \
       "2" "（舊版）節點安裝 / 卸載" \
-      "3" "小工具（Docker/Portainer/https_test/ping_tools）" \
+      "3" "小工具（Docker/Portainer/https_test）" \
       "Q" "退出" 3>&1 1>&2 2>&3) || exit 1
 
     case "$SEL" in
@@ -180,6 +180,12 @@ main_menu() {
 }
 
 # 主程式
-change_yum_repos
+echo -e "${YELLOW}是否更換源(repo)?${RESET}"
+read -p "y/N: " change_repo
+if [[ "$change_repo" == "Y" || "$change_repo" == "y" ]]; then
+    change_yum_repos
+else
+    echo -e "${GREEN}不更換源。${RESET}"
+fi
 yum install -y newt
 main_menu
