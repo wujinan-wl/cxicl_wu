@@ -74,9 +74,7 @@ docker_remove_images_other() {
 # 刪除現有portainer，包含container及image
 delete_portainer() {
     
-    # 上線
     wget -O /root/remove_pt_enviroment.py ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/Portainer/remove_pt_enviroment.py
-
     chmod +x /root/remove_pt_enviroment.py
     python /root/remove_pt_enviroment.py
 
@@ -109,10 +107,7 @@ delete_portainer() {
 # 移除監控
 remove_lnms() {
     echo -e "${YELLOW}下載 LibreNMS 卸載腳本...${RESET}"
-
-    # 上線
     wget -O /root/remove_LibreNMS_device.py ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/LibreNMS/remove_LibreNMS_device.py
-
     chmod +x /root/remove_LibreNMS_device.py
     python "/root/remove_LibreNMS_device.py"
     echo -e "${GREEN} 全都處理完成，可通知機房下架 ${RESET}"
