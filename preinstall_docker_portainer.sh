@@ -84,21 +84,32 @@ preinstall_yum() {
         sleep 2
     fi
 
-    # 確認是否安裝ntpdate
-    if ! command -v ntpdate >/dev/null 2>&1; then
-        yum install -y ntpdate || {
-            echo -e "${RED}安裝 ntpdate 失敗${RESET}"
+    # 確認是否安裝chrony
+    if ! command -v chrony >/dev/null 2>&1; then
+        yum install -y chrony || {
+            echo -e "${RED}安裝 chrony 失敗${RESET}"
             echo -e "${RED}請更新源或是確認 yum.repos 配置是否異常${RESET}"
         }
     else
-        echo -e "${GREEN}ntpdate 已存在，略過安裝${RESET}"
+        echo -e "${GREEN}chrony 已存在，略過安裝${RESET}"
         sleep 2
     fi
 
     echo -e "${YELLOW}準備同步時間...${RESET}"
-    ntpdate time.stdtime.gov.tw || { echo -e "${RED}同步時間失敗，請確認網路是否正常${RESET}"; exit 1; }
-    sleep 5
-    echo -e "${GREEN}時間同步完成！${RESET}"
+    sudo systemctl start chronyd
+    sudo systemctl enable chronyd
+    echo -e "${YELLOW}設定時區中...${RESET}"
+    timedatectl set-timezone Asia/Taipei
+    sleep 3
+    echo -e "${YELLOW}正在同步時間...${RESET}"
+    chronyc sources
+    sleep 3
+    tdc=$(timedatectl | grep "Time zone" | awk '{print $3}')
+    if [[ "$tdc" == "Asia/Taipei" ]]; then
+        echo -e "${GREEN}時間同步完成！${RESET}"
+    else
+        error_exit "時間同步失敗，請稍後手動確認"
+    fi
 }
 
 # 處理防火牆：關閉firewalld防火牆並驗證其狀態
