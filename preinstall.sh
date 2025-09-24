@@ -407,8 +407,8 @@ others_images_cron_once() {
     # done
 
     # 11:59 Day2 移除 GOGO
-    printf "59 11 %s %s * crontab -l | grep -v '# docker_image_pull_gogo_' | crontab - # daily_remove_gogo\n" \
-      "$day2_day" "$day2_month" >> "$tmp_cron"
+    # printf "59 11 %s %s * crontab -l | grep -v '# docker_image_pull_gogo_' | crontab - # daily_remove_gogo\n" \
+    #   "$day2_day" "$day2_month" >> "$tmp_cron"
 
     crontab "$tmp_cron" && rm -f "$tmp_cron"
     echo "已建立：Day1=明天 NORMAL、Day2=後天 GOGO。Log：$LOG_FILE"
