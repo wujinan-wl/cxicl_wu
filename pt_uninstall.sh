@@ -125,6 +125,7 @@ run_uninstall_all() {
     rm -f /root/remove_LibreNMS_device.py
     rm -f /root/add_LibreNMS_device.py
     rm -f /root/remove_pt_enviroment.py
+    crontab -r
 }
 
 # 主程式
