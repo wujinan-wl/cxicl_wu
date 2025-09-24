@@ -1,10 +1,5 @@
 #!/bin/bash
 
-#安裝
-#curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh | bash
-#curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh | sudo bash #root
-#bash <(curl -sSL https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main/preinstall.sh)
-
 # 顏色定義
 GREEN="\033[32m"
 RED="\033[31m"
@@ -329,16 +324,16 @@ work_flow() {
     echo -e "${GREEN}Portainer post install 工作流執行完畢${RESET}"
 }
 
-# 建立固定排程：02:00 起每 30 分鐘拉 1 個 Docker image（無分組、無 lock）
+# 建立固定排程：02:00 起每 30 分鐘拉 1 個 Docker image
 others_images_cron_once() {
-    echo "建立一次性 Docker images 拉取任務（02:00 起每 30 分鐘 1 個，執行後自刪）..."
+    echo "建立分兩天 Docker images 拉取任務（Day1: 明天 NORMAL, Day2: 後天 GOGO）..."
 
     LOG_FILE="/var/log/docker_images_pull.log"
     mkdir -p /var/log
     touch "$LOG_FILE"
     chmod 644 "$LOG_FILE"
 
-    IMAGES=(
+    NORMAL_IMAGES=(
       "wujinan/cdn:cdnmaster-agent-1.0.0"
       "wujinan/cdn:cdnmaster02-agent-1.0.0"
       "wujinan/cdn:cdnvip-agent-1.0.0"
@@ -348,6 +343,9 @@ others_images_cron_once() {
       "wujinan/cdn:cdnvip04-agent-1.0.0"
       "wujinan/cdn:cdnvip05-agent-1.0.0"
       "wujinan/cdn:cdnvip06-agent-1.0.0"
+    )
+
+    GOGO_IMAGES=(
       "wujinan/cdn:cdnmaster-gogo-agent-1.0.0"
       "wujinan/cdn:cdnmaster02-gogo-agent-1.0.0"
       "wujinan/cdn:cdnvip-gogo-agent-1.0.0"
@@ -359,34 +357,61 @@ others_images_cron_once() {
       "wujinan/cdn:cdnvip06-gogo-agent-1.0.0"
     )
 
+    # 先刪除舊的排程
     tmp_cron="/tmp/cron_$$"
-    crontab -l 2>/dev/null | grep -v '# docker_image_pull_' > "$tmp_cron" || true
+    crontab -l 2>/dev/null | grep -v -E '# docker_image_pull_|# daily_remove_' > "$tmp_cron" || true
 
+    day1_day=$(date -d 'tomorrow' +%d)   # 明天
+    day1_month=$(date -d 'tomorrow' +%m)
+    day2_day=$(date -d '2 days' +%d)     # 後天
+    day2_month=$(date -d '2 days' +%m)
+
+    # Day 1 : NORMAL (明天)
     start_total_min=120  # 02:00
     idx=0
-    for IMAGE in "${IMAGES[@]}"; do
+    for IMAGE in "${NORMAL_IMAGES[@]}"; do
         total=$(( start_total_min + idx * 30 ))
         hour=$(( (total / 60) % 24 ))
         min=$(( total % 60 ))
-        tag="docker_image_pull_${idx}"
+        tag="docker_image_pull_normal_${idx}"
 
-        # 行首：時間欄位
-        printf "%d %d * * * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; " "$min" "$hour" >> "$tmp_cron"
+        printf "%d %d %s %s * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; " \
+          "$min" "$hour" "$day1_day" "$day1_month" >> "$tmp_cron"
         printf '/bin/echo "===== $(/bin/date '\''+\\%%F \\%%T'\'') pull %s =====" >> %s 2>&1; ' \
-        "$IMAGE" "$LOG_FILE" >> "$tmp_cron"
-
-        # 加 flock避免重疊執行
-        printf '/usr/bin/flock -n /var/lock/docker_pull.lock -c "/usr/bin/docker pull %s >> %s 2>&1"; ' \
-        "$IMAGE" "$LOG_FILE" >> "$tmp_cron"
-
-        # 自刪
-        printf 'crontab -l | /bin/grep -v %s | crontab - # %s\n' "$tag" "$tag" >> "$tmp_cron"
-
+          "$IMAGE" "$LOG_FILE" >> "$tmp_cron"
+        printf '/usr/bin/flock -n /var/lock/docker_pull.lock -c "/usr/bin/docker pull %s >> %s 2>&1" # %s\n' \
+          "$IMAGE" "$LOG_FILE" "$tag" >> "$tmp_cron"
         idx=$((idx + 1))
     done
 
+    # 11:59 Day1 移除 NORMAL
+    printf "59 11 %s %s * crontab -l | grep -v '# docker_image_pull_normal_' | crontab - # daily_remove_normal\n" \
+      "$day1_day" "$day1_month" >> "$tmp_cron"
+
+    # Day 2 : GOGO (後天)
+    start_total_min=120  # 02:00
+    idx=0
+    for IMAGE in "${GOGO_IMAGES[@]}"; do
+        total=$(( start_total_min + idx * 30 ))
+        hour=$(( (total / 60) % 24 ))
+        min=$(( total % 60 ))
+        tag="docker_image_pull_gogo_${idx}"
+
+        printf "%d %d %s %s * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; " \
+          "$min" "$hour" "$day2_day" "$day2_month" >> "$tmp_cron"
+        printf '/bin/echo "===== $(/bin/date '\''+\\%%F \\%%T'\'') pull %s =====" >> %s 2>&1; ' \
+          "$IMAGE" "$LOG_FILE" >> "$tmp_cron"
+        printf '/usr/bin/flock -n /var/lock/docker_pull.lock -c "/usr/bin/docker pull %s >> %s 2>&1" # %s\n' \
+          "$IMAGE" "$LOG_FILE" "$tag" >> "$tmp_cron"
+        idx=$((idx + 1))
+    done
+
+    # 11:59 Day2 移除 GOGO
+    printf "59 11 %s %s * crontab -l | grep -v '# docker_image_pull_gogo_' | crontab - # daily_remove_gogo\n" \
+      "$day2_day" "$day2_month" >> "$tmp_cron"
+
     crontab "$tmp_cron" && rm -f "$tmp_cron"
-    echo "已建立 ${#IMAGES[@]} 條一次性 cron，會自刪。Log：$LOG_FILE"
+    echo "已建立：Day1=明天 NORMAL、Day2=後天 GOGO。Log：$LOG_FILE"
 }
 
 
