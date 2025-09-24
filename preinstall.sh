@@ -389,22 +389,22 @@ others_images_cron_once() {
       "$day1_day" "$day1_month" >> "$tmp_cron"
 
     # Day 2 : GOGO (後天)
-    start_total_min=120  # 02:00
-    idx=0
-    for IMAGE in "${GOGO_IMAGES[@]}"; do
-        total=$(( start_total_min + idx * 30 ))
-        hour=$(( (total / 60) % 24 ))
-        min=$(( total % 60 ))
-        tag="docker_image_pull_gogo_${idx}"
+    # start_total_min=120  # 02:00
+    # idx=0
+    # for IMAGE in "${GOGO_IMAGES[@]}"; do
+    #     total=$(( start_total_min + idx * 30 ))
+    #     hour=$(( (total / 60) % 24 ))
+    #     min=$(( total % 60 ))
+    #     tag="docker_image_pull_gogo_${idx}"
 
-        printf "%d %d %s %s * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; " \
-          "$min" "$hour" "$day2_day" "$day2_month" >> "$tmp_cron"
-        printf '/bin/echo "===== $(/bin/date '\''+\\%%F \\%%T'\'') pull %s =====" >> %s 2>&1; ' \
-          "$IMAGE" "$LOG_FILE" >> "$tmp_cron"
-        printf '/usr/bin/flock -n /var/lock/docker_pull.lock -c "/usr/bin/docker pull %s >> %s 2>&1" # %s\n' \
-          "$IMAGE" "$LOG_FILE" "$tag" >> "$tmp_cron"
-        idx=$((idx + 1))
-    done
+    #     printf "%d %d %s %s * PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; " \
+    #       "$min" "$hour" "$day2_day" "$day2_month" >> "$tmp_cron"
+    #     printf '/bin/echo "===== $(/bin/date '\''+\\%%F \\%%T'\'') pull %s =====" >> %s 2>&1; ' \
+    #       "$IMAGE" "$LOG_FILE" >> "$tmp_cron"
+    #     printf '/usr/bin/flock -n /var/lock/docker_pull.lock -c "/usr/bin/docker pull %s >> %s 2>&1" # %s\n' \
+    #       "$IMAGE" "$LOG_FILE" "$tag" >> "$tmp_cron"
+    #     idx=$((idx + 1))
+    # done
 
     # 11:59 Day2 移除 GOGO
     printf "59 11 %s %s * crontab -l | grep -v '# docker_image_pull_gogo_' | crontab - # daily_remove_gogo\n" \
