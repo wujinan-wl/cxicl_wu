@@ -472,7 +472,6 @@ main(){
     # 裝容器 + 上節點
     postinstall_mode
     echo -e "${YELLOW}記得確認【節點同步】、【修改節點名子】、【增加子IP】！${RESET}"
-    echo -e "${YELLOW}若選擇【穿牆版本】，記得用小工具裝GOGO穿牆${RESET}"
 }
 
 main
