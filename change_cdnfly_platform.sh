@@ -1,4 +1,4 @@
-#!bin/bash
+#!/bin/bash
 
 # 顏色定義
 GREEN="\033[32m"
