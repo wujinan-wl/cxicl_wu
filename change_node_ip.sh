@@ -143,7 +143,7 @@ clean_portainer_env_and_container() {
         echo "✔ 已刪除容器：$CONTAINER_NAME"
     done
 
-    wget -O /opt/Portainer/remove_pt_enviroment_for_changing_IP.py ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/Portainer/remove_pt_enviroment.py
+    wget -O /opt/Portainer/remove_pt_enviroment_for_changing_IP.py ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/Portainer/remove_pt_enviroment_for_changing_IP.py
     chmod +x /opt/Portainer/remove_pt_enviroment_for_changing_IP.py
     python /opt/Portainer/remove_pt_enviroment_for_changing_IP.py
 
@@ -219,12 +219,12 @@ postisntall() {
 # 主程式
 disable_firewalld
 collect_ip_change_input
-echo -e "${GREEN}Portainer post install 1執行完畢${RESET}"
+echo -e "${GREEN}collect_ip_change_input 1執行完畢${RESET}"
 install_python
-echo -e "${GREEN}Portainer post install 2執行完畢${RESET}"
+echo -e "${GREEN}install_python 2執行完畢${RESET}"
 clean_portainer_env_and_container
-echo -e "${GREEN}Portainer post install 3執行完畢${RESET}"
+echo -e "${GREEN}clean_portainer_env_and_container 3執行完畢${RESET}"
 create_portainer_agent_container
-echo -e "${GREEN}Portainer post install 4執行完畢${RESET}"
+echo -e "${GREEN}create_portainer_agent_container 4執行完畢${RESET}"
 postisntall
 echo -e "${GREEN}Portainer post install 5執行完畢${RESET}"
