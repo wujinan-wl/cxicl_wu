@@ -99,7 +99,7 @@ menu_install_remove() {
   while true; do
     CH=$(whiptail --backtitle "Excalibur && Stella" \
       --title "安裝流程" --menu "選擇安裝步驟" 18 70 8 \
-      "1" "（新）PT安裝腳本" \  
+      "1" "（新）PT安裝腳本" \
       "2" "（新）PT卸載腳本" \
       "3" "（新）PT重裝GOGO穿牆" \
       "4" "（新）PT搬移主控" \
