@@ -1,190 +1,230 @@
-#!/bin/bash
-set -e
+#!bin/bash
 
-# 顏色（純 echo 用，whiptail 不吃 ANSI）
-GREEN="\033[32m"; 
-YELLOW="\033[33m"; 
-RED="\033[31m"; 
+
+# 顏色定義
+GREEN="\033[32m"
+RED="\033[31m"
+YELLOW="\033[33m"
 RESET="\033[0m"
 
-# 上線後新安裝
-NEW_SCRIPT_BASE_URL="https://raw.githubusercontent.com/wujinan-wl/cxicl_wu/main"
-run_preinstall()       { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/preinstall.sh); }
-run_uninstall_all()    { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/pt_uninstall.sh); }
-run_only_docker()      { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/preinstall_only_docker.sh); }
-run_docker_portainer() { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/preinstall_docker_portainer.sh); }
-run_https_test()       { bash <(curl -sSL $NEW_SCRIPT_BASE_URL/https_test.sh); }
 
-# 舊安裝
-run_legacy_install()   { collect_user_input_old_install; }
-run_legacy_uninstall() { 
-  wget ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/agent_uninstall.sh &&  
-  chmod +x agent_uninstall.sh && 
-  mv agent_uninstall.sh /opt/agent_uninstall.sh && 
-  bash /opt/agent_uninstall.sh
-}
+declare -A STATUS
 
-# 換源
-change_yum_repos() {
-    echo -e "${YELLOW}更換 yum 源...${RESET}"
-    echo -e "${YELLOW}準備更換源環境中...${RESET}"
-    sleep 5
-    bash <(curl -sSL https://linuxmirrors.cn/main.sh)
-    echo -e "${GREEN}yum 源更換完成！${RESET}"
-}
 
-# 統一的完成提示
-pause_choice() {
-  local msg="${1:-已完成，請選擇後續動作}"
-  if whiptail --backtitle "Excalibur && Stella" --title "完成" \
-      --yesno "$msg\n\nYes = 結束腳本\nNo = 返回選單" 12 60; then
-      exit 0     # No → 結束腳本
-  else
-      return 0   # Yes → 返回選單
-  fi
-}
+# 目錄路徑
+REMOTE_PATH="ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54"
+SAVE_PATH="/opt/Portainer"
 
-# 舊安裝方法
-collect_user_input_old_install() {
-  IP_LIST=$(ip -4 addr | grep inet | awk '{print $2}' | cut -d/ -f1 | grep -vE '^(127|10|172\.1[6-9]|172\.2[0-9]|172\.3[0-1]|192\.168|169\.254)\.')
-  NODE_IP=$(echo "$IP_LIST" | head -n1)
-  DATE=$(date +%Y%m%d)
-  NODE_NAME="${NODE_IP}_${DATE}"
 
-  declare -A CMD_MAP
-  CMD_MAP["CDNMASTER"]="curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh || curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh  && chmod +x agent.sh && ./agent.sh --master-ver v5.2.1 --master-ip 203.69.59.134 --es-ip 203.69.59.134 --es-pwd cPPgonzfIe"
-  CMD_MAP["CDNMASTER2"]="curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh || curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh  && chmod +x agent.sh && ./agent.sh --master-ver v5.2.1 --master-ip 61.66.110.131 --es-ip 61.66.110.131 --es-pwd vIPU1jHpCi"
-  CMD_MAP["CDNVIP"]="curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh || curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh  && chmod +x agent.sh && ./agent.sh --master-ver v5.2.1 --master-ip 122.146.115.2 --es-ip 122.146.115.2 --es-pwd liaz8OAhmx"
-  CMD_MAP["CDNVIP01"]="curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh || curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh  && chmod +x agent.sh && ./agent.sh --master-ver v5.2.1 --master-ip 211.21.100.151 --es-ip 211.21.100.151 --es-pwd pDCR7MwqVo"
-  CMD_MAP["CDNVIP02"]="curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh || curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh  && chmod +x agent.sh && ./agent.sh --master-ver v5.2.1 --master-ip 211.21.100.152 --es-ip 211.21.100.152 --es-pwd 894QMh0dw2"
-  CMD_MAP["CDNVIP03"]="curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh || curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh  && chmod +x agent.sh && ./agent.sh --master-ver v5.2.1 --master-ip 211.21.100.153 --es-ip 211.21.100.153 --es-pwd R8dNi5DZjQ"
-  CMD_MAP["CDNVIP04"]="curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh || curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh  && chmod +x agent.sh && ./agent.sh --master-ver v5.2.1 --master-ip 211.21.100.154 --es-ip 211.21.100.154 --es-pwd gwCvT5PY2K"
-  CMD_MAP["CDNVIP05"]="curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh || curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh  && chmod +x agent.sh && ./agent.sh --master-ver v5.2.1 --master-ip 211.21.100.155 --es-ip 211.21.100.155 --es-pwd mn7wBIxt8n"
-  CMD_MAP["CDNVIP06"]="curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh || curl -m 5 https://cxhilcdn.noctw.com/httpcdnfly/agent.sh -o agent.sh  && chmod +x agent.sh && ./agent.sh --master-ver v5.2.1 --master-ip 211.21.100.156 --es-ip 211.21.100.156 --es-pwd 7z7fi1tbnC"
+# 遠端下載路徑:postinstall
+POST_SCRIPTS=(
+    "portainer_register.py ${REMOTE_PATH}/Portainer/portainer_register.py"
+    "get_yaml_2_container.py ${REMOTE_PATH}/Portainer/get_yaml_2_container.py"
+    "check_container_info.py ${REMOTE_PATH}/Portainer/check_container_info.py"
+    "sync_container_2_cdnfly.py ${REMOTE_PATH}/Portainer/sync_container_2_cdnfly.py"
+    "mekanism.py ${REMOTE_PATH}/Portainer/mekanism.py"
+    "cdnfly_api.json ${REMOTE_PATH}/Portainer/cdnfly_api.json"
+)
 
-  PLATFORM=$(whiptail --backtitle "Excalibur && Stella" \
-    --title "舊版：選擇主控" --menu "請選擇要連線的主控平台" 22 78 12 \
-    "CDNMASTER"  "" \
-    "CDNMASTER2" "" \
-    "CDNVIP"     "" \
-    "CDNVIP01"   "" \
-    "CDNVIP02"   "" \
-    "CDNVIP03"   "" \
-    "CDNVIP04"   "" \
-    "CDNVIP05"   "" \
-    "CDNVIP06"   "" \
-    "返回"       "" 3>&1 1>&2 2>&3) || return 0
 
-  [ "$PLATFORM" = "返回" ] && return 0
+# 處理防火牆：關閉firewalld防火牆並驗證其狀態
+disable_firewalld() {
+    echo -e "${YELLOW}關閉 firewalld 防火牆...${RESET}"
+    STATE=$(systemctl is-active firewalld 2>/dev/null || true)
+    sleep 3
 
-  CONFIRM_MSG="請確認：\n\n主控平台：$PLATFORM\n節點主IP：$NODE_IP\n"
-  if whiptail --backtitle "Excalibur && Stella" --title "資料確認" --yesno "$CONFIRM_MSG" 12 60; then
-    if [[ -n "${CMD_MAP[$PLATFORM]}" ]]; then
-      echo -e "${GREEN}開始部署：$PLATFORM${RESET}"
-      eval "${CMD_MAP[$PLATFORM]}"
-      pause_choice "舊版安裝流程已執行完成。"
+    if [[ "$STATE" == "inactive" ]]; then
+        echo -e "${GREEN}firewalld 防火牆已關閉${RESET}"
+    elif [[ "$STATE" == "unknown" ]]; then
+        echo -e "${GREEN}firewalld 未安裝，視同已關閉${RESET}"
+    elif [[ "$STATE" == "active" ]]; then
+        echo -e "${RED}firewalld 防火牆仍在運作中，關閉中請等待其關閉...${RESET}"
+        systemctl stop firewalld || error_exit "無法停止 firewalld"
+        systemctl disable firewalld || error_exit "無法停用 firewalld"
+        sleep 3
+        echo -e "${GREEN}firewalld 防火牆已關閉${RESET}"
     else
-      echo -e "${RED}未知主控：$PLATFORM${RESET}"
-      pause_choice "未知主控：$PLATFORM"
+        error_exit "firewalld 防火牆未成功關閉，請稍後手動確認"
     fi
-  fi
 }
 
-# 分組子選單
-menu_install_remove() {
-  while true; do
-    CH=$(whiptail --backtitle "Excalibur && Stella" \
-      --title "安裝流程" --menu "選擇安裝步驟" 18 70 8 \
-      "1" "（新）安裝腳本" \
-      "2" "（新）卸載腳本" \
-      "B" "返回主選單" 3>&1 1>&2 2>&3) || return
-    case "$CH" in
-      1)
-        run_preinstall
-        pause_choice "安裝腳本已完成。"
-        ;;
-      2)
-        run_uninstall_all
-        pause_choice "卸載腳本已完成。"
-        ;;
-      B) return ;;
-    esac
-  done
+
+# 輸入要清掉的IP
+collect_ip_change_input() {
+    yum install -y newt
+    mkdir -p "$SAVE_PATH"
+
+    # 從 user_input.json 讀取 node_ip 作為 OLD_IP
+    OLD_IP=$(python -c "import json; print(json.load(open('$SAVE_PATH/user_input.json'))['node_ip'])" 2>/dev/null)
+
+    if [ -z "$OLD_IP" ]; then
+        whiptail --title "讀取失敗" --msgbox "無法從 user_input.json 讀取 node_ip，請確認檔案是否存在。" 8 60
+        return 1
+    fi
+
+    # Step 1：輸入「更換後主 IP」
+    NEW_IP=$(whiptail --title "IP 更換" \
+        --inputbox "【更換前】主 IP：$OLD_IP\n\n請輸入【更換後】主 IP：" \
+        10 60 "" \
+        3>&1 1>&2 2>&3)
+
+    [ $? -ne 0 ] && echo -e "${YELLOW}✖ 使用者取消${RESET}" && return 1
+
+    if ! [[ "$NEW_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        whiptail --title "格式錯誤" --msgbox "「更換後 IP」格式不正確，請重新輸入。" 8 50
+        collect_ip_change_input
+        return
+    fi
+
+    if [ "$OLD_IP" == "$NEW_IP" ]; then
+        whiptail --title "輸入錯誤" --msgbox "更換前後 IP 不可相同，請重新輸入。" 8 50
+        collect_ip_change_input
+        return
+    fi
+
+    # Step 2：確認所有資訊
+    CONFIRM_MSG="請確認以下 IP 更換設定：\n
+  更換前主 IP ：$OLD_IP
+  更換後主 IP ：$NEW_IP\n
+確認後將寫入設定檔並執行後續流程。"
+
+    if whiptail --title "資料確認" --yesno "$CONFIRM_MSG" 14 60; then
+        cat > "$SAVE_PATH/user_input_for_changing_IP.json" <<EOF
+{
+  "old_ip": "$OLD_IP",
+  "new_ip": "$NEW_IP"
+}
+EOF
+        echo -e "${GREEN}✔ 資料已儲存至 $SAVE_PATH/user_input_for_changing_IP.json${RESET}"
+
+    else
+        echo -e "${RED}資料未確認，重新填寫…${RESET}"
+        collect_ip_change_input
+    fi
 }
 
-menu_legacy() {
-  while true; do
-    CH=$(whiptail --backtitle "Excalibur && Stella" \
-      --title "舊版工具" --menu "舊版安裝/卸載" 18 70 8 \
-      "A" "（舊）安裝節點" \
-      "R" "（舊）卸載節點" \
-      "B" "返回主選單" 3>&1 1>&2 2>&3) || return
-    case "$CH" in
-      A)
-        run_legacy_install
-        pause_choice "（舊）安裝節點流程已完成。"
-        ;;
-      R)
-        run_legacy_uninstall
-        pause_choice "（舊）卸載節點流程已完成。"
-        ;;
-      B) return ;;
-    esac
-  done
+
+# 安裝python：安裝python2.7及其pip套件
+install_python() {
+    echo -e "${YELLOW}安裝 Python 2.7 及 pip...${RESET}"
+
+    # 安裝python (阿里雲yum預設python版本為2.7)
+    if ! command -v python2.7 >/dev/null 2>&1; then
+        yum install -y python2 || error_exit "安裝 python2 失敗"
+    else
+        echo -e "${GREEN}Python 2.7 已存在，略過安裝${RESET}"
+    fi
+
+    # 手動配置python 2.7適配的pip2
+    if ! command -v pip2 >/dev/null 2>&1; then
+        curl -O https://bootstrap.pypa.io/pip/2.7/get-pip.py || error_exit "下載 get-pip.py 失敗"
+        python2.7 get-pip.py || {
+            echo -e "${RED}安裝 pip2 失敗${RESET}"
+            echo -e "${YELLOW}請通知飛書客服組群組${RESET}"
+            exit 1
+        }
+        rm -f get-pip.py
+        echo -e "${GREEN}pip2 安裝完成${RESET}"
+    else
+        echo -e "${GREEN}pip2 已存在，略過安裝${RESET}"
+    fi
+
+    # pip2 (requests、netaddr、PyJWT)套件
+    pip2 install requests netaddr  PyJWT==1.7.1|| { echo -e "${RED}安裝 python + pip2 失敗${RESET}"; exit 1; }
 }
 
-menu_tools() {
-  while true; do
-    CH=$(whiptail --backtitle "Excalibur && Stella" \
-      --title "小工具" --menu "輔助腳本" 20 70 10 \
-      "D" "僅安裝 Docker" \
-      "P" "僅安裝 Docker + Portainer" \
-      "H" "安裝 https_test" \
-      "B" "返回主選單" 3>&1 1>&2 2>&3) || return
-    case "$CH" in
-      D)
-        run_only_docker
-        pause_choice "僅安裝 Docker 已完成。"
-        ;;
-      P)
-        run_docker_portainer
-        pause_choice "安裝 Docker + Portainer 已完成。"
-        ;;
-      H)
-        run_https_test
-        pause_choice "https_test 已完成。"
-        ;;
-      B) return ;;
-    esac
-  done
+
+# 先清掉PT環境及container
+clean_portainer_env_and_container() {
+    
+    docker ps -a --format '{{.Names}}' | while read CONTAINER_NAME; do
+        docker stop "$CONTAINER_NAME"
+        docker rm "$CONTAINER_NAME"
+        echo "✔ 已刪除容器：$CONTAINER_NAME"
+    done
+
+    wget -O /opt/Portainer/remove_pt_enviroment_for_changing_IP.py ftp://jengbo:KHdcCNapN6d2FNzK@211.23.160.54/Portainer/remove_pt_enviroment.py
+    chmod +x /opt/Portainer/remove_pt_enviroment_for_changing_IP.py
+    python /opt/Portainer/remove_pt_enviroment_for_changing_IP.py
+
+    # 重啟 Docker 重建 iptables chain
+    echo -e "${YELLOW}重啟 Docker 以重建 iptables 規則...${RESET}"
+    systemctl restart docker
+    sleep 3
+    echo -e "${GREEN}✔ Docker 重啟完成${RESET}"
 }
 
-# 主選單：只放分組
-main_menu() {
-  while true; do
-    SEL=$(whiptail --backtitle "Excalibur && Stella" \
-      --title "主選單" --menu "請選擇動作分類" 20 78 10 \
-      "1" "（新版PT）節點安裝 / 卸載" \
-      "2" "（舊版）節點安裝 / 卸載" \
-      "3" "小工具（Docker/Portainer/https_test）" \
-      "Q" "退出" 3>&1 1>&2 2>&3) || exit 1
 
-    case "$SEL" in
-      1) menu_install_remove ;;
-      2) menu_legacy  ;;
-      3) menu_tools   ;;
-      Q) exit 0       ;;
-    esac
-  done
+# 重建PT專屬容器(Agent)
+create_portainer_agent_container() {
+    docker run -d \
+        -p 9101:9001 \
+        --name portainer_agent \
+        --restart=always \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v /var/lib/docker/volumes:/var/lib/docker/volumes \
+        -v /:/host \
+        portainer/agent:2.27.8 || {
+        echo -e "${RED}portainer_agent container 建立失敗${RESET}"
+        echo -e "${YELLOW}請通知飛書客服組群組${RESET}"
+        exit 1
+    }
 }
+
+
+# 下載所有 postinstall python腳本
+download_all_post_scripts() {
+    echo -e "${YELLOW}下載所有 postinstall 腳本...${RESET}"
+    for item in "${POST_SCRIPTS[@]}"; do
+        IFS=" " read -r filename url <<< "$item"
+        wget -O "$SAVE_PATH/$filename" "$url"
+        if [[ $? -ne 0 ]]; then
+            echo -e "${RED}下載 ${filename} 失敗${RESET}"
+            # STATUS["下載_${filename}"]="${RED}✖ 失敗${RESET}"
+        else
+            chmod +x "$SAVE_PATH/$filename"
+            echo -e "${GREEN}下載並設權限：${filename}${RESET}"
+            # STATUS["下載_${filename}"]="${GREEN}✔ 成功${RESET}"
+        fi
+    done
+}
+
+
+# 執行單一腳本
+run_post_script() {
+    filename=$1
+    echo -e "${YELLOW}執行 ${filename}...${RESET}"
+    python "$SAVE_PATH/$filename"
+    result=$?
+    if [[ $result -ne 0 ]]; then
+        echo -e "${RED}✖ ${filename} 執行失敗（exit code: $result）${RESET}"
+        STATUS["執行_${filename}"]="${RED}✖ 失敗（$result）${RESET}"
+        return 1
+    else
+        echo -e "${GREEN}✔ ${filename} 執行成功${RESET}"
+        STATUS["執行_${filename}"]="${GREEN}✔ 成功${RESET}"
+        return 0
+    fi
+}
+
+
+postisntall() {
+    run_post_script "portainer_register.py" || exit 1
+    run_post_script "get_yaml_2_container.py" || exit 1
+    run_post_script "check_container_info.py" || exit 1
+    run_post_script "sync_container_2_cdnfly.py" || exit 1
+}
+
 
 # 主程式
-echo -e "${YELLOW}是否更換源(repo)?${RESET}"
-read -p "y/N: " change_repo
-if [[ "$change_repo" == "Y" || "$change_repo" == "y" ]]; then
-    change_yum_repos
-else
-    echo -e "${GREEN}不更換源。${RESET}"
-fi
-yum install -y newt
-main_menu
+disable_firewalld
+collect_ip_change_input
+echo -e "${GREEN}Portainer post install 1執行完畢${RESET}"
+install_python
+echo -e "${GREEN}Portainer post install 2執行完畢${RESET}"
+clean_portainer_env_and_container
+echo -e "${GREEN}Portainer post install 3執行完畢${RESET}"
+create_portainer_agent_container
+echo -e "${GREEN}Portainer post install 4執行完畢${RESET}"
+postisntall
+echo -e "${GREEN}Portainer post install 5執行完畢${RESET}"
